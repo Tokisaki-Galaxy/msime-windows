@@ -220,14 +220,14 @@ layouts = ["horizontal"]
 themes = ["dark"]
 
 [candidate_window]
+line_gap_dip = 6
+
 [candidate_window.border_image]
 source = "assets/border.png"
 slice_dip = [16, 44, 16, 0]
 stretch_dip = [16, 90, 16, 0]
 width_dip = [16, 44, 16, 0]
 fill = true
-
-line_gap_dip = 6
 
 [candidate_window.content_insets_dip]
 top = 4
