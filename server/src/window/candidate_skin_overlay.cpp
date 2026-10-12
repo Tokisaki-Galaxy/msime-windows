@@ -22,6 +22,12 @@ void CandidateSkinOverlay::Arrange(const msimeui::RectF &finalRect)
     bounds_ = finalRect;
 }
 
+bool CandidateSkinOverlay::HitTest(const msimeui::PointF & /*point*/) const
+{
+    return false;
+}
+
+// TODO(v2 皮肤): v2 自由挂件暂定 WebView2 独占，D2D 这里尚未按 z_index 分层，全部按声明顺序画在卡片之上。
 void CandidateSkinOverlay::Render(msimeui::DeviceResources &deviceResources)
 {
     if (items_.empty() || bounds_.width <= 0.0f || bounds_.height <= 0.0f)

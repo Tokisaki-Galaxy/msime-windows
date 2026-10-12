@@ -588,14 +588,12 @@ std::optional<Package> Load(const std::filesystem::path &skinsRoot, const std::s
                         SetError(error, "candidate_window.decorations.anchor 无效");
                         return std::nullopt;
                     }
-                    const auto offsetX = decTable->get("offset_x_dip")->value<double>();
-                    dec.offsetXDip = offsetX ? *offsetX : 0.0;
-                    const auto offsetY = decTable->get("offset_y_dip")->value<double>();
-                    dec.offsetYDip = offsetY ? *offsetY : 0.0;
+                    // 这三个键可选，缺省时 table::get 返回空指针，必须经 node_view 取值
+                    dec.offsetXDip = (*decTable)["offset_x_dip"].value_or(0.0);
+                    dec.offsetYDip = (*decTable)["offset_y_dip"].value_or(0.0);
                     dec.widthDip = BoundedNumber(*decTable, "width_dip", 2000.0);
                     dec.heightDip = BoundedNumber(*decTable, "height_dip", 2000.0);
-                    const auto z = decTable->get("z_index")->value<int64_t>();
-                    dec.zIndex = z ? static_cast<int>(*z) : 2;
+                    dec.zIndex = static_cast<int>((*decTable)["z_index"].value_or(int64_t{2}));
                     if (dec.widthDip <= 0.0 || dec.heightDip <= 0.0)
                     {
                         SetError(error, "candidate_window.decorations 的 width_dip 与 height_dip 必须大于 0");

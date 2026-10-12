@@ -32,8 +32,9 @@ class CandidateSkinOverlay : public msimeui::Visual
     msimeui::SizeF Measure(const msimeui::SizeF &availableSize) override;
     void Arrange(const msimeui::RectF &finalRect) override;
     void Render(msimeui::DeviceResources &deviceResources) override;
+    // 挂件纯装饰，叠在卡片那一格上方，点击必须穿透给候选。
+    bool HitTest(const msimeui::PointF &point) const override;
 
   private:
     std::vector<Item> items_;
-    msimeui::RectF bounds_{};
 };

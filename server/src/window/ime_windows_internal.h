@@ -109,8 +109,9 @@ double GetCandidateDecorationTopDip();
 int GetCandidatePackingMarginTopDip();
 std::pair<double, double> AddCandidateDecorationToSize(const std::pair<double, double> &cardSize);
 int GetCandidateOuterTopPx(int cardAnchorY, int packingTopDip, FLOAT scale);
-// v2 挂件往卡片左侧外挂时，窗口左侧要额外留出的空白（px）。没有外挂挂件时返回 0。
-int GetCandidateOuterLeftPx(FLOAT scale);
+// 外留白信封的左边（屏幕 px）：卡片左边再往左让出 v2 的 outer_insets_dip.left。
+// MarginLeft 与 MarginTop 一样指向信封左上角，卡片由皮肤 CSS 相对定位回原位。
+int GetCandidateOuterLeftPx(int cardAnchorX, FLOAT scale);
 void ClipCandidateWindowToContent(HWND hwnd, const std::pair<double, double> &containerSize, FLOAT scale,
                                   double extraTopDip = 0.0);
 void ClearCandidateWindowRegion(HWND hwnd);

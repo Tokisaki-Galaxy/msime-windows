@@ -284,3 +284,48 @@ z_index = 3
 
     fs::remove_all(skins_root, ec);
 }
+
+TEST_CASE(candidate_skin_catalog_defaults_optional_decoration_keys)
+{
+    namespace fs = std::filesystem;
+    const fs::path skins_root =
+        fs::temp_directory_path() / (L"msime-skin-v2-decor-" + std::to_wstring(GetCurrentProcessId())) / L"skins";
+    std::error_code ec;
+    fs::remove_all(skins_root, ec);
+    fs::create_directories(skins_root / L"art" / L"assets", ec);
+    REQUIRE(!ec);
+    {
+        std::ofstream file(skins_root / L"art" / L"assets" / L"char.png", std::ios::binary | std::ios::trunc);
+        REQUIRE(file.is_open());
+    }
+    std::ofstream manifest(skins_root / L"art" / L"skin.toml", std::ios::binary | std::ios::trunc);
+    REQUIRE(manifest.is_open());
+    // offset_x_dip、offset_y_dip、z_index 都可省略；缺省时不能解引用空节点。
+    manifest << R"toml(schema_version = 2
+id = "art"
+name = "Art"
+version = "2.0.0"
+base = "fluent"
+
+[supports]
+layouts = ["horizontal"]
+themes = ["dark"]
+
+[[candidate_window.decorations]]
+image = "assets/char.png"
+width_dip = 40
+height_dip = 30
+)toml";
+    manifest.close();
+
+    std::string error;
+    const auto package = CandidateSkinCatalog::Load(skins_root, "art", &error);
+    REQUIRE(error.empty());
+    REQUIRE(package.has_value());
+    REQUIRE_EQ(package->freeDecorations.size(), static_cast<size_t>(1));
+    REQUIRE_EQ(package->freeDecorations[0].offsetXDip, 0.0);
+    REQUIRE_EQ(package->freeDecorations[0].offsetYDip, 0.0);
+    REQUIRE_EQ(package->freeDecorations[0].zIndex, 2);
+
+    fs::remove_all(skins_root, ec);
+}

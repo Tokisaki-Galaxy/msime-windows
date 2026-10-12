@@ -146,13 +146,13 @@ int GetCandidateOuterTopPx(int cardAnchorY, int packingTopDip, FLOAT scale)
     return cardAnchorY + static_cast<int>(std::lround(outerOffsetDip * static_cast<double>(scale)));
 }
 
-int GetCandidateOuterLeftPx(FLOAT scale)
+int GetCandidateOuterLeftPx(int cardAnchorX, FLOAT scale)
 {
     if (scale <= 0.0f)
     {
         scale = 1.0f;
     }
-    return static_cast<int>(std::lround(GetCandidateOuterLeftDip() * static_cast<double>(scale)));
+    return cardAnchorX - static_cast<int>(std::lround(GetCandidateOuterLeftDip() * static_cast<double>(scale)));
 }
 
 void RememberCandidateClip(const std::pair<double, double> &decoratedSize, FLOAT scale, int caretX, int caretY)
@@ -291,8 +291,9 @@ void ReanchorCandidateHostToPaintedCard(const POINT &layoutCaret, const std::pai
             hostY = coordinates.top + edgePadPx;
         }
     }
+    const int desiredOuterLeftPx = GetCandidateOuterLeftPx(anchorPos->first, scale);
     Global::MarginLeft =
-        (std::max)(0, static_cast<int>(std::lround((anchorPos->first - hostX) / static_cast<double>(scale))));
+        (std::max)(0, static_cast<int>(std::lround((desiredOuterLeftPx - hostX) / static_cast<double>(scale))));
     Global::MarginTop = GetCandidateOuterMarginDip(desiredOuterTopPx, hostY, scale);
 }
 

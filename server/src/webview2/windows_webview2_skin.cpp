@@ -406,6 +406,13 @@ std::wstring BuildExternalCandidateSkinCss(const CandidateSkinCatalog::Package &
         css.append(L" center / contain no-repeat; pointer-events: none; }\n"
                    L".container { position: relative; z-index: 1; }\n");
     }
+    if (skin.outerInsetsDip && (skin.outerInsetsDip->left > 0.0 || skin.outerInsetsDip->top > 0.0))
+    {
+        // MarginLeft / MarginTop 指向外留白信封的左上角，这里把卡片连同挂件相对定位回卡片原位。
+        // 用相对定位而不是 padding：.containerParent 是挂件的定位容器，加 padding 会把挂件锚点挪到信封上。
+        css.append(fmt::format(L".containerParent {{ position: relative; left: {}px; top: {}px; }}\n",
+                               skin.outerInsetsDip->left, skin.outerInsetsDip->top));
+    }
     AppendExternalCandidateCornerCss(css, skin);
     const bool light = ResolveConfiguredTheme(GetConfiguredThemeCand()) == "light";
     const CandidateSkinCatalog::CandidateColors &colors = light ? skin.light : skin.dark;

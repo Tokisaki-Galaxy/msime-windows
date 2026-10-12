@@ -1050,6 +1050,8 @@ void CandidatePresenter::ApplySkin()
         impl_->skinOverlay->SetItems(std::move(items));
     }
     // v2 的 line_gap_dip 落到预编辑行与候选列表之间的间距上。
+    // TODO(v2 皮肤): 暂定 WebView2 独占。SetSpacing 作用于 body 的全部子元素，竖排时列表与翻页栏之间也会被拉开，
+    // WebView2 只加在 .row.pinyin 下方。
     if (impl_->body)
     {
         impl_->body->SetSpacing(package && package->lineGapDip ? static_cast<float>(*package->lineGapDip) : 2.0f);
@@ -1080,6 +1082,8 @@ void CandidatePresenter::ApplySkin()
         if (package && package->borderImage && !package->borderImage->source.empty())
         {
             // v2 九宫格：四边原样、其余拉伸。切片按 1/2/4 值展开成「上右下左」。
+            // TODO(v2 皮肤): 暂定 WebView2 独占。D2D 尚未处理 width_dip 与 fill = false，九宫格仍叠在卡片底色、
+            // 描边与阴影之上并被卡片圆角裁剪；WebView2 会把这些清成透明、圆角归零。
             const CandidateSkinCatalog::BorderImage &bi = *package->borderImage;
             const std::vector<double> &values = bi.stretchDip.empty() ? bi.sliceDip : bi.stretchDip;
             const auto expand4 = [](const std::vector<double> &v, float out[4]) {
