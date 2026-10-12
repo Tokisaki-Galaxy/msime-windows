@@ -1845,7 +1845,7 @@ void Border::Render(DeviceResources &deviceResources)
     Container::Render(deviceResources);
 }
 
-Card::Card(Brush brush, float padding) : brush_(brush), padding_(padding)
+Card::Card(Brush brush, float padding) : brush_(brush), padding_{padding, padding, padding, padding}
 {
 }
 
@@ -1857,7 +1857,13 @@ void Card::SetBrush(Brush brush)
 
 void Card::SetPadding(float padding)
 {
-    if (padding_ == padding)
+    SetPadding(Thickness{padding, padding, padding, padding});
+}
+
+void Card::SetPadding(Thickness padding)
+{
+    if (padding_.left == padding.left && padding_.top == padding.top && padding_.right == padding.right &&
+        padding_.bottom == padding.bottom)
     {
         return;
     }
@@ -1909,8 +1915,8 @@ void Card::SetShadowEnabled(bool enabled)
 
 SizeF Card::Measure(const SizeF &availableSize)
 {
-    const SizeF inner = {std::max(availableSize.width - padding_ * 2.0f, 0.0f),
-                         std::max(availableSize.height - padding_ * 2.0f, 0.0f)};
+    const SizeF inner = {std::max(availableSize.width - padding_.left - padding_.right, 0.0f),
+                         std::max(availableSize.height - padding_.top - padding_.bottom, 0.0f)};
 
     float width = 0.0f;
     float height = 0.0f;
@@ -1921,16 +1927,16 @@ SizeF Card::Measure(const SizeF &availableSize)
         height = std::max(height, childSize_.height);
     }
 
-    return {width + padding_ * 2.0f, height + padding_ * 2.0f};
+    return {width + padding_.left + padding_.right, height + padding_.top + padding_.bottom};
 }
 
 void Card::Arrange(const RectF &finalRect)
 {
     bounds_ = finalRect;
 
-    const RectF inner = {finalRect.x + padding_, finalRect.y + padding_,
-                         std::max(finalRect.width - padding_ * 2.0f, 0.0f),
-                         std::max(finalRect.height - padding_ * 2.0f, 0.0f)};
+    const RectF inner = {finalRect.x + padding_.left, finalRect.y + padding_.top,
+                         std::max(finalRect.width - padding_.left - padding_.right, 0.0f),
+                         std::max(finalRect.height - padding_.top - padding_.bottom, 0.0f)};
 
     for (const auto &child : children_)
     {

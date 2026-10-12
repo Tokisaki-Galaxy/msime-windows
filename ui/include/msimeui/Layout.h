@@ -363,6 +363,8 @@ class Card : public Panel
 
     void SetBrush(Brush brush);
     void SetPadding(float padding);
+    // 四边独立的内边距，给 v2 皮肤的 content_insets_dip 用。
+    void SetPadding(Thickness padding);
     void SetShadowScale(float scale);
     // Multiplies every shadow pass alpha; 1.0 keeps the built-in intensity.
     void SetShadowOpacity(float opacity);
@@ -391,7 +393,7 @@ class Card : public Panel
                                const D2D1_ROUNDED_RECT &shape);
 
     Brush brush_;
-    float padding_ = 0.0f;
+    Thickness padding_ = {};
     std::wstring backgroundImage_;
     ImageStretch backgroundStretch_ = ImageStretch::UniformToFill;
     float backgroundOpacity_ = 1.0f;
