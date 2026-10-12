@@ -68,12 +68,12 @@
 
 ### `[[candidate_window.decorations]]`（v2 可选，数组表，仅 WebView2）
 
-自由锚定立绘挂件层，支持叠加角色立绘与 APNG 动图。目前最多生效两层（对应 `::before` 与 `::after`）。
+自由锚定立绘挂件层，支持叠加角色立绘与 APNG 动图，层数不限。
 
 - `image`：图片路径
 - `anchor`：`top-left` | `top-right` | `bottom-left` | `bottom-right` | `left` | `right` | `top` | `bottom` | `center`
 - `width_dip` / `height_dip`：挂件的尺寸
-- `offset_x_dip` / `offset_y_dip`：相对锚点的平移量，正数向右、向下
+- `offset_x_dip` / `offset_y_dip`：相对锚点的平移量，正数向右、向下，两个后端同一套语义
 - `z_index`：层级，默认为 `2`
 
 ## `[candidate.dark]` / `[candidate.light]`

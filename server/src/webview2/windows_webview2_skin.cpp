@@ -506,40 +506,76 @@ std::wstring BuildExternalCandidateSkinCss(const CandidateSkinCatalog::Package &
         // 预编辑行与候选行之间的行距。基础皮肤把它并进 .row 的上下边距，这里显式覆盖。
         css.append(fmt::format(L".row.pinyin {{ margin-bottom: {}px; }}\n", *skin.lineGapDip));
     }
-    // 自由挂件只能是 ::before / ::after 两层：候选框页面里没有可承载任意数量挂件的元素。
-    // 需要更多层时要把挂件元素注入容器，那属于另一处改动。
-    for (size_t idx = 0; idx < skin.freeDecorations.size() && idx < 2; ++idx)
+    // 自由挂件：数量不限。候选框页面里没有能承载任意数量挂件的元素，所以按皮肤声明逐个生成
+    // 一份 CSS 规则，由 InjectExternalCandidateSkin 注入对应数量的空 div，挂件层数不再受
+    // ::before / ::after 两层限制。
+    if (!skin.freeDecorations.empty())
+    {
+        css.append(L".containerParent { position: relative; }\n");
+        css.append(L".msime-skin-decor { position: absolute; pointer-events: none; "
+                   L"background-position: center; background-repeat: no-repeat; background-size: contain; }\n");
+    }
+    for (size_t idx = 0; idx < skin.freeDecorations.size(); ++idx)
     {
         const auto &dec = skin.freeDecorations[idx];
+        // offset 语义统一：正数向右、向下，与 D2D 侧 CandidateSkinOverlay 一致。
+        const double ox = dec.offsetXDip;
+        const double oy = dec.offsetYDip;
         std::wstring posRule;
         if (dec.anchor == "top-left")
-            posRule = fmt::format(L"top: {}px; left: {}px;", dec.offsetYDip, dec.offsetXDip);
+            posRule = fmt::format(L"left: {}px; top: {}px;", ox, oy);
         else if (dec.anchor == "top-right")
-            posRule = fmt::format(L"top: {}px; right: {}px;", dec.offsetYDip, -dec.offsetXDip);
+            posRule = fmt::format(L"right: {}px; top: {}px;", -ox, oy);
         else if (dec.anchor == "bottom-left")
-            posRule = fmt::format(L"bottom: {}px; left: {}px;", -dec.offsetYDip, dec.offsetXDip);
+            posRule = fmt::format(L"left: {}px; bottom: {}px;", ox, -oy);
         else if (dec.anchor == "bottom-right")
-            posRule = fmt::format(L"bottom: {}px; right: {}px;", -dec.offsetYDip, -dec.offsetXDip);
-        else if (dec.anchor == "right")
-            posRule = fmt::format(L"top: 50%; right: {}px; transform: translateY(-50%);", -dec.offsetXDip);
+            posRule = fmt::format(L"right: {}px; bottom: {}px;", -ox, -oy);
         else if (dec.anchor == "left")
-            posRule = fmt::format(L"top: 50%; left: {}px; transform: translateY(-50%);", dec.offsetXDip);
+            posRule = fmt::format(L"left: {}px; top: 50%; transform: translateY(calc(-50% + {}px));", ox, oy);
+        else if (dec.anchor == "right")
+            posRule = fmt::format(L"right: {}px; top: 50%; transform: translateY(calc(-50% + {}px));", -ox, oy);
         else if (dec.anchor == "top")
-            posRule = fmt::format(L"top: {}px; left: 50%; transform: translateX(-50%);", dec.offsetYDip);
+            posRule = fmt::format(L"top: {}px; left: 50%; transform: translateX(calc(-50% + {}px));", oy, ox);
         else if (dec.anchor == "bottom")
-            posRule = fmt::format(L"bottom: {}px; left: 50%; transform: translateX(-50%);", -dec.offsetYDip);
+            posRule = fmt::format(L"bottom: {}px; left: 50%; transform: translateX(calc(-50% + {}px));", -oy, ox);
         else
-            posRule = fmt::format(L"top: 50%; left: 50%; transform: translate(-50%, -50%);");
+            posRule = fmt::format(L"left: 50%; top: 50%; "
+                                  L"transform: translate(calc(-50% + {}px), calc(-50% + {}px));",
+                                  ox, oy);
 
-        const wchar_t *pseudo = (idx == 0) ? L"::before" : L"::after";
-        css.append(L".containerParent { position: relative; }\n");
-        css.append(fmt::format(L".containerParent:not(:empty){} {{ content: \"\"; position: absolute; "
-                               L"z-index: {}; {} width: {}px; height: {}px; background: ",
-                               pseudo, dec.zIndex, posRule, dec.widthDip, dec.heightDip));
+        css.append(fmt::format(L".msime-skin-decor[data-i=\"{}\"] {{ z-index: {}; {} width: {}px; height: {}px; "
+                               L"background-image: ",
+                               idx, dec.zIndex, posRule, dec.widthDip, dec.heightDip));
         css.append(ManifestImageCssUrl(skinsRoot, skin.id, dec.image));
-        css.append(L" center / contain no-repeat; pointer-events: none; }\n");
+        css.append(L"; }\n");
     }
     return css;
+}
+
+// 挂件层数的 CSS 已经按 data-i 生成，这里把对应数量的空 div 补进 .containerParent。
+// 页面自己的脚本只换 .container 的内容，不动 .containerParent，所以这些 div 不会被打掉。
+std::wstring BuildFreeDecorationLayerScript(const CandidateSkinCatalog::Package &skin)
+{
+    if (skin.freeDecorations.empty())
+    {
+        return L"";
+    }
+    std::wstring indices;
+    for (size_t i = 0; i < skin.freeDecorations.size(); ++i)
+    {
+        if (i > 0)
+            indices += L",";
+        indices += std::to_wstring(i);
+    }
+    return L"<script id=\"external-candidate-skin-decor\">(function(){"
+           L"function add(){var parent=document.getElementById('realContainerParent');if(!parent){return;}"
+           L"[" +
+           indices +
+           L"].forEach(function(i){if(parent.querySelector('.msime-skin-decor[data-i=\"'+i+'\"]')){return;}"
+           L"var node=document.createElement('div');node.className='msime-skin-decor';"
+           L"node.setAttribute('data-i',String(i));parent.appendChild(node);});}"
+           L"if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',add);}else{add();}"
+           L"})();</script>";
 }
 
 bool InjectExternalCandidateSkin(std::wstring &html, const CandidateSkinCatalog::Package &skin,
@@ -565,7 +601,7 @@ bool InjectExternalCandidateSkin(std::wstring &html, const CandidateSkinCatalog:
     {
         return false;
     }
-    html.insert(headEnd, vars + generated);
+    html.insert(headEnd, vars + generated + BuildFreeDecorationLayerScript(skin));
     return true;
 }
 
