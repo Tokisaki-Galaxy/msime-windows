@@ -44,23 +44,36 @@
 
 - `source`：图片路径（如 `assets/skin1.png`，支持 APNG/WebP/PNG）
 - `slice_dip`：`[top, right, bottom, left]` 切片线位置，正数数组，支持 1~4 个值
+- `stretch_dip`：可选，可拉伸区，语义同 `slice_dip` 但更直白，给出时覆盖它。**面板图里画死的装饰必须落在可拉伸区之外**，否则会被横向拉长；例如帆船画在右侧，就把右侧切片放到船身左侧
 - `width_dip`：可选，边框绘制宽度，支持 1~4 个值
 - `fill`：可选，布尔值，是否保留九宫格中心内容区域，默认为 `true`
 
 ### `[candidate_window.content_insets_dip]`（v2 可选，仅 WebView2）
 
-候选框内容与文字的安全内边距，避开贴图四周自带的花纹或立绘。
+候选框内容与文字的安全内边距，**从面板外缘量起**，用来避开贴图四周自带的花纹或立绘。渲染时会把该方向的边框宽度扣掉，落到内容盒上。
 
 - `top` / `right` / `bottom` / `left`：四边内边距浮点数
+
+### `[candidate_window]` 的 `line_gap_dip`（v2 可选）
+
+预编辑行与候选行之间的行距，`0`–`100`。不写则沿用 `base` 的行距。
+
+### `[candidate_window.outer_insets_dip]`（v2 可选）
+
+挂件挂在卡片外沿时，窗口需要额外预留的透明空白，从卡片四边往外量。
+
+- `top` / `right` / `bottom` / `left`：四边预留量浮点数
+
+**不声明时窗口只按卡片大小开，挂到卡片外面的立绘会被窗口边界裁掉。**
 
 ### `[[candidate_window.decorations]]`（v2 可选，数组表，仅 WebView2）
 
 自由锚定立绘挂件层，支持叠加角色立绘与 APNG 动图。目前最多生效两层（对应 `::before` 与 `::after`）。
 
 - `image`：图片路径
-- `anchor`：`top-left` | `top-right` | `bottom-left` | `bottom-right` | `right` | `left`
+- `anchor`：`top-left` | `top-right` | `bottom-left` | `bottom-right` | `left` | `right` | `top` | `bottom` | `center`
 - `width_dip` / `height_dip`：挂件的尺寸
-- `offset_x_dip` / `offset_y_dip`：相对锚定点的水平与垂直偏移（支持负值外挂溢出）
+- `offset_x_dip` / `offset_y_dip`：相对锚点的平移量，正数向右、向下
 - `z_index`：层级，默认为 `2`
 
 ## `[candidate.dark]` / `[candidate.light]`
