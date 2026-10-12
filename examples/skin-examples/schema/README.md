@@ -55,7 +55,7 @@
 
 ### `[[candidate_window.decorations]]`（v2 可选，数组表，仅 WebView2）
 
-自由锚定立绘挂件层，支持叠加多层角色立绘与 APNG 动图。
+自由锚定立绘挂件层，支持叠加角色立绘与 APNG 动图。目前最多生效两层（对应 `::before` 与 `::after`）。
 
 - `image`：图片路径
 - `anchor`：`top-left` | `top-right` | `bottom-left` | `bottom-right` | `right` | `left`

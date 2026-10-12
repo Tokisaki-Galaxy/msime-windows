@@ -430,9 +430,12 @@ std::wstring BuildExternalCandidateSkinCss(const CandidateSkinCatalog::Package &
 
         css.append(L".container:not(:empty) { border-style: solid; border-image-source: ");
         css.append(ManifestImageCssUrl(skinsRoot, skin.id, bi.source));
-        css.append(fmt::format(L"; border-image-slice: {}; border-image-width: {}; border-image-repeat: stretch; "
+        // border-width 决定内容盒的内缩量，必须与 border-image-width 一致；只写 border-image-width
+        // 时内容盒仍按基础皮肤的 border 宽度内缩，文字会压在贴图上。
+        css.append(fmt::format(L"; border-width: {}; border-image-slice: {}; border-image-width: {}; "
+                               L"border-image-repeat: stretch; "
                                L"background-color: transparent; border-color: transparent; border-radius: 0; }}\n",
-                               sliceStr, widthStr));
+                               widthStr, sliceStr, widthStr));
     }
     if (skin.contentInsetsDip)
     {
@@ -440,7 +443,9 @@ std::wstring BuildExternalCandidateSkinCss(const CandidateSkinCatalog::Package &
         css.append(fmt::format(L".container:not(:empty) {{ padding: {}px {}px {}px {}px !important; }}\n", insets.top,
                                insets.right, insets.bottom, insets.left));
     }
-    for (size_t idx = 0; idx < skin.freeDecorations.size(); ++idx)
+    // 自由挂件只能是 ::before / ::after 两层：候选框页面里没有可承载任意数量挂件的元素。
+    // 需要更多层时要把挂件元素注入容器，那属于另一处改动。
+    for (size_t idx = 0; idx < skin.freeDecorations.size() && idx < 2; ++idx)
     {
         const auto &dec = skin.freeDecorations[idx];
         std::wstring posRule;
