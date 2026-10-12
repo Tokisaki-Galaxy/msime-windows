@@ -933,6 +933,16 @@ StackPanel::StackPanel(float spacing) : spacing_(spacing)
 {
 }
 
+void StackPanel::SetSpacing(float spacing)
+{
+    if (spacing_ == spacing)
+    {
+        return;
+    }
+    spacing_ = spacing;
+    InvalidateMeasure();
+}
+
 void StackPanel::SetHorizontalContentAlignment(HorizontalAlignment alignment)
 {
     horizontalContentAlignment_ = alignment;
@@ -1964,12 +1974,37 @@ void Card::Render(DeviceResources &deviceResources)
 void Card::SetBackgroundImage(std::wstring filePath, ImageStretch stretch, float opacity)
 {
     const float clamped = std::clamp(opacity, 0.0f, 1.0f);
-    if (backgroundImage_ == filePath && backgroundStretch_ == stretch && backgroundOpacity_ == clamped)
+    if (backgroundImage_ == filePath && !backgroundNineSlice_ && backgroundStretch_ == stretch &&
+        backgroundOpacity_ == clamped)
     {
         return;
     }
     backgroundImage_ = std::move(filePath);
+    backgroundNineSlice_ = false;
     backgroundStretch_ = stretch;
+    backgroundOpacity_ = clamped;
+    InvalidateVisual();
+}
+
+void Card::SetBackgroundImageNineSlice(std::wstring filePath, float left, float top, float right, float bottom,
+                                       float opacity)
+{
+    const float clamped = std::clamp(opacity, 0.0f, 1.0f);
+    const float l = (std::max)(0.0f, left);
+    const float t = (std::max)(0.0f, top);
+    const float r = (std::max)(0.0f, right);
+    const float b = (std::max)(0.0f, bottom);
+    if (backgroundImage_ == filePath && backgroundNineSlice_ && sliceLeft_ == l && sliceTop_ == t && sliceRight_ == r &&
+        sliceBottom_ == b && backgroundOpacity_ == clamped)
+    {
+        return;
+    }
+    backgroundImage_ = std::move(filePath);
+    backgroundNineSlice_ = true;
+    sliceLeft_ = l;
+    sliceTop_ = t;
+    sliceRight_ = r;
+    sliceBottom_ = b;
     backgroundOpacity_ = clamped;
     InvalidateVisual();
 }
@@ -2019,6 +2054,44 @@ void Card::RenderBackgroundImage(DeviceResources &deviceResources, ID2D1RenderTa
         return;
     }
     target->PushLayer(D2D1::LayerParameters(D2D1::InfiniteRect(), clip.Get()), layer.Get());
+    if (backgroundNineSlice_)
+    {
+        // 九宫格：四角原样、四边单向拉伸、中心双向拉伸。切片单位与源图像素一致，
+        // 图像按 96 DPI 绘制时 1 源像素 = 1 DIP。
+        const float srcW = sourceSize.width;
+        const float srcH = sourceSize.height;
+        const float l = (std::min)(sliceLeft_, srcW);
+        const float t = (std::min)(sliceTop_, srcH);
+        const float r = (std::min)(sliceRight_, srcW - l);
+        const float b = (std::min)(sliceBottom_, srcH - t);
+        const float dl = (std::min)(l, bounds_.width);
+        const float dt = (std::min)(t, bounds_.height);
+        const float dr = (std::min)(r, bounds_.width - dl);
+        const float db = (std::min)(b, bounds_.height - dt);
+        const float sx[3] = {0.0f, l, srcW - r};
+        const float sw[3] = {l, srcW - l - r, r};
+        const float dx[3] = {bounds_.x, bounds_.x + dl, bounds_.x + bounds_.width - dr};
+        const float dw[3] = {dl, bounds_.width - dl - dr, dr};
+        const float sy[3] = {0.0f, t, srcH - b};
+        const float sh[3] = {t, srcH - t - b, b};
+        const float dy[3] = {bounds_.y, bounds_.y + dt, bounds_.y + bounds_.height - db};
+        const float dh[3] = {dt, bounds_.height - dt - db, db};
+        for (int row = 0; row < 3; ++row)
+        {
+            for (int col = 0; col < 3; ++col)
+            {
+                if (sw[col] <= 0.0f || sh[row] <= 0.0f || dw[col] <= 0.0f || dh[row] <= 0.0f)
+                {
+                    continue;
+                }
+                target->DrawBitmap(bitmap, D2D1::RectF(dx[col], dy[row], dx[col] + dw[col], dy[row] + dh[row]),
+                                   backgroundOpacity_, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                                   D2D1::RectF(sx[col], sy[row], sx[col] + sw[col], sy[row] + sh[row]));
+            }
+        }
+        target->PopLayer();
+        return;
+    }
     target->DrawBitmap(bitmap,
                        D2D1::RectF(destination.x, destination.y, destination.x + destination.width,
                                    destination.y + destination.height),
