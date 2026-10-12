@@ -213,7 +213,8 @@ void PlaceCandidateHostNearCaret(HWND hwnd, std::pair<double, double> requestedC
     }
 
     const int offsetXDip = static_cast<int>(std::lround((properPos->first - hostX) / static_cast<double>(layoutScale)));
-    Global::MarginLeft = (std::max)(0, offsetXDip);
+    // 卡片左边也要留出 v2 挂件外挂的空白，否则左侧挂件被窗口边界裁掉。
+    Global::MarginLeft = (std::max)(0, offsetXDip + GetCandidateOuterLeftPx(layoutScale));
     Global::MarginTop = GetCandidateOuterMarginDip(desiredOuterTopPx, hostY, layoutScale);
     const int marginLeftBeforeKeep = Global::MarginLeft;
     const int marginTopBeforeKeep = Global::MarginTop;
@@ -604,7 +605,7 @@ int FineTuneWindow(HWND hwnd)
             auto applyCardMargins = [&](FLOAT marginScale) {
                 const int offsetXDip =
                     static_cast<int>(std::lround((properPos->first - hostX) / static_cast<double>(marginScale)));
-                Global::MarginLeft = (std::max)(0, offsetXDip);
+                Global::MarginLeft = (std::max)(0, offsetXDip + GetCandidateOuterLeftPx(marginScale));
                 Global::MarginTop = GetCandidateOuterMarginDip(desiredOuterTopPx, hostY, marginScale);
             };
             // Already on screen: first-pass size/flip is a guess. Applying it
@@ -719,7 +720,7 @@ int FineTuneWindow(HWND hwnd)
 
                 const int offsetXDip =
                     static_cast<int>(std::lround((properPos->first - hostX) / static_cast<double>(layoutScale)));
-                Global::MarginLeft = (std::max)(0, offsetXDip);
+                Global::MarginLeft = (std::max)(0, offsetXDip + GetCandidateOuterLeftPx(layoutScale));
                 Global::MarginTop = GetCandidateOuterMarginDip(desiredOuterTopPx, hostY, layoutScale);
                 KeepCandidateCardInsideHostAndMonitor(hostX, hostY, hostWidthPx, hostHeightPx, decoratedSize.first,
                                                       decoratedSize.second, layoutScale, coordinates,
@@ -902,7 +903,7 @@ int FineTuneWindow(HWND hwnd)
 
                         const int offsetXDip =
                             static_cast<int>(std::lround((properPos->first - hostX) / static_cast<double>(pass2Scale)));
-                        Global::MarginLeft = (std::max)(0, offsetXDip);
+                        Global::MarginLeft = (std::max)(0, offsetXDip + GetCandidateOuterLeftPx(pass2Scale));
                         Global::MarginTop = GetCandidateOuterMarginDip(desiredOuterTopPx, hostY, pass2Scale);
                         KeepCandidateCardInsideHostAndMonitor(hostX, hostY, hostWidthPx, hostHeightPx,
                                                               decoratedPaintedSize.first, decoratedPaintedSize.second,

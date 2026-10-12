@@ -109,6 +109,8 @@ double GetCandidateDecorationTopDip();
 int GetCandidatePackingMarginTopDip();
 std::pair<double, double> AddCandidateDecorationToSize(const std::pair<double, double> &cardSize);
 int GetCandidateOuterTopPx(int cardAnchorY, int packingTopDip, FLOAT scale);
+// v2 挂件往卡片左侧外挂时，窗口左侧要额外留出的空白（px）。没有外挂挂件时返回 0。
+int GetCandidateOuterLeftPx(FLOAT scale);
 void ClipCandidateWindowToContent(HWND hwnd, const std::pair<double, double> &containerSize, FLOAT scale,
                                   double extraTopDip = 0.0);
 void ClearCandidateWindowRegion(HWND hwnd);

@@ -146,6 +146,15 @@ int GetCandidateOuterTopPx(int cardAnchorY, int packingTopDip, FLOAT scale)
     return cardAnchorY + static_cast<int>(std::lround(outerOffsetDip * static_cast<double>(scale)));
 }
 
+int GetCandidateOuterLeftPx(FLOAT scale)
+{
+    if (scale <= 0.0f)
+    {
+        scale = 1.0f;
+    }
+    return static_cast<int>(std::lround(GetCandidateOuterLeftDip() * static_cast<double>(scale)));
+}
+
 void RememberCandidateClip(const std::pair<double, double> &decoratedSize, FLOAT scale, int caretX, int caretY)
 {
     g_has_last_candidate_clip = decoratedSize.first > 1.0 && decoratedSize.second > 1.0;
