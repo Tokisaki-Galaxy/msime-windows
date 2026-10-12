@@ -394,6 +394,83 @@ std::wstring BuildExternalCandidateSkinCss(const CandidateSkinCatalog::Package &
                                L"background-clip: border-box; }}\n",
                                size));
     }
+    if (skin.borderImage)
+    {
+        // v2 专有九宫格贴图边框
+        const auto &bi = *skin.borderImage;
+        std::wstring sliceStr;
+        for (size_t i = 0; i < bi.sliceDip.size(); ++i)
+        {
+            if (i > 0)
+                sliceStr += L" ";
+            sliceStr += fmt::format(L"{}", bi.sliceDip[i]);
+        }
+        if (bi.fill)
+            sliceStr += L" fill";
+
+        std::wstring widthStr;
+        if (!bi.widthDip.empty())
+        {
+            for (size_t i = 0; i < bi.widthDip.size(); ++i)
+            {
+                if (i > 0)
+                    widthStr += L" ";
+                widthStr += fmt::format(L"{}px", bi.widthDip[i]);
+            }
+        }
+        else
+        {
+            for (size_t i = 0; i < bi.sliceDip.size(); ++i)
+            {
+                if (i > 0)
+                    widthStr += L" ";
+                widthStr += fmt::format(L"{}px", bi.sliceDip[i]);
+            }
+        }
+
+        css.append(L".container:not(:empty) { border-style: solid; border-image-source: ");
+        css.append(ManifestImageCssUrl(skinsRoot, skin.id, bi.source));
+        css.append(fmt::format(L"; border-image-slice: {}; border-image-width: {}; border-image-repeat: stretch; "
+                               L"background-color: transparent; border-color: transparent; border-radius: 0; }}\n",
+                               sliceStr, widthStr));
+    }
+    if (skin.contentInsetsDip)
+    {
+        const auto &insets = *skin.contentInsetsDip;
+        css.append(fmt::format(L".container:not(:empty) {{ padding: {}px {}px {}px {}px !important; }}\n", insets.top,
+                               insets.right, insets.bottom, insets.left));
+    }
+    for (size_t idx = 0; idx < skin.freeDecorations.size(); ++idx)
+    {
+        const auto &dec = skin.freeDecorations[idx];
+        std::wstring posRule;
+        if (dec.anchor == "top-left")
+            posRule = fmt::format(L"top: {}px; left: {}px;", dec.offsetYDip, dec.offsetXDip);
+        else if (dec.anchor == "top-right")
+            posRule = fmt::format(L"top: {}px; right: {}px;", dec.offsetYDip, -dec.offsetXDip);
+        else if (dec.anchor == "bottom-left")
+            posRule = fmt::format(L"bottom: {}px; left: {}px;", -dec.offsetYDip, dec.offsetXDip);
+        else if (dec.anchor == "bottom-right")
+            posRule = fmt::format(L"bottom: {}px; right: {}px;", -dec.offsetYDip, -dec.offsetXDip);
+        else if (dec.anchor == "right")
+            posRule = fmt::format(L"top: 50%; right: {}px; transform: translateY(-50%);", -dec.offsetXDip);
+        else if (dec.anchor == "left")
+            posRule = fmt::format(L"top: 50%; left: {}px; transform: translateY(-50%);", dec.offsetXDip);
+        else if (dec.anchor == "top")
+            posRule = fmt::format(L"top: {}px; left: 50%; transform: translateX(-50%);", dec.offsetYDip);
+        else if (dec.anchor == "bottom")
+            posRule = fmt::format(L"bottom: {}px; left: 50%; transform: translateX(-50%);", -dec.offsetYDip);
+        else
+            posRule = fmt::format(L"top: 50%; left: 50%; transform: translate(-50%, -50%);");
+
+        const wchar_t *pseudo = (idx == 0) ? L"::before" : L"::after";
+        css.append(L".containerParent { position: relative; }\n");
+        css.append(fmt::format(L".containerParent:not(:empty){} {{ content: \"\"; position: absolute; "
+                               L"z-index: {}; {} width: {}px; height: {}px; background: ",
+                               pseudo, dec.zIndex, posRule, dec.widthDip, dec.heightDip));
+        css.append(ManifestImageCssUrl(skinsRoot, skin.id, dec.image));
+        css.append(L" center / contain no-repeat; pointer-events: none; }\n");
+    }
     return css;
 }
 

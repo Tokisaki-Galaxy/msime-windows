@@ -57,8 +57,41 @@ struct ToolbarColors
     std::string hover;
 };
 
+struct BorderImage
+{
+    std::string source;
+    // 四边切片大小（DIP）：top, right, bottom, left
+    std::vector<double> sliceDip;
+    // 四边宽度（DIP）：top, right, bottom, left；若为空则沿用 sliceDip
+    std::vector<double> widthDip;
+    // 是否填充中间内容区域
+    bool fill = true;
+};
+
+struct InsetsDip
+{
+    double top = 0.0;
+    double right = 0.0;
+    double bottom = 0.0;
+    double left = 0.0;
+};
+
+struct FreeDecoration
+{
+    std::string image;
+    // 锚定基准：top-left, top-right, bottom-left, bottom-right, left, right, top, bottom, center
+    std::string anchor = "right";
+    double offsetXDip = 0.0;
+    double offsetYDip = 0.0;
+    double widthDip = 0.0;
+    double heightDip = 0.0;
+    int zIndex = 2;
+};
+
 struct Package
 {
+    // 皮肤规范版本：1 为通用现代卡片皮肤，2 为支持九宫格与自由挂件的高级皮肤。
+    int schemaVersion = 1;
     std::string id;
     std::string name;
     std::string version;
@@ -97,6 +130,12 @@ struct Package
     std::optional<double> toolbarCornerRadiusDip;
     ToolbarColors toolbarDark;
     ToolbarColors toolbarLight;
+    // v2 专有特性：九宫格贴图边框
+    std::optional<BorderImage> borderImage;
+    // v2 专有特性：面板内容/文字安全内边距
+    std::optional<InsetsDip> contentInsetsDip;
+    // v2 专有特性：多层自由锚定挂件（支持动图）
+    std::vector<FreeDecoration> freeDecorations;
 };
 
 struct Issue

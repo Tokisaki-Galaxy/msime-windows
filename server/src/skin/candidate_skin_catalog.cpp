@@ -330,12 +330,14 @@ std::optional<Package> Load(const std::filesystem::path &skinsRoot, const std::s
             return std::nullopt;
         }
         const toml::table &root = *parsed;
-        if (root["schema_version"].value_or(0) != 1)
+        const int schemaVersion = static_cast<int>(root["schema_version"].value_or(0));
+        if (schemaVersion != 1 && schemaVersion != 2)
         {
-            SetError(error, "仅支持 schema_version 1");
+            SetError(error, "仅支持 schema_version 1 或 2");
             return std::nullopt;
         }
         Package package;
+        package.schemaVersion = schemaVersion;
         if (!ReadString(root, "id", package.id, 64, true) || package.id != id ||
             !ReadString(root, "name", package.name, 80, true) ||
             !ReadString(root, "version", package.version, 32, true) ||
@@ -444,6 +446,121 @@ std::optional<Package> Load(const std::filesystem::path &skinsRoot, const std::s
                 }
             }
         }
+        if (package.schemaVersion >= 2)
+        {
+            if (const toml::node *borderImageNode = window->get("border_image"))
+            {
+                const auto *borderImageTable = borderImageNode->as_table();
+                BorderImage bi;
+                if (!borderImageTable || !borderImageTable->contains("source") ||
+                    !ReadResource(*borderImageTable, "source", bi.source))
+                {
+                    SetError(error, "candidate_window.border_image.source 无效");
+                    return std::nullopt;
+                }
+                const auto *sliceArr = (*borderImageTable)["slice_dip"].as_array();
+                if (!sliceArr || (sliceArr->size() != 1 && sliceArr->size() != 2 && sliceArr->size() != 4))
+                {
+                    SetError(error, "candidate_window.border_image.slice_dip 必须包含 1、2 或 4 个数值");
+                    return std::nullopt;
+                }
+                for (const auto &val : *sliceArr)
+                {
+                    const auto num = val.value<double>();
+                    if (!num || *num < 0.0 || *num > 500.0)
+                    {
+                        SetError(error, "candidate_window.border_image.slice_dip 超出范围");
+                        return std::nullopt;
+                    }
+                    bi.sliceDip.push_back(*num);
+                }
+                if (const auto *widthArr = (*borderImageTable)["width_dip"].as_array())
+                {
+                    if (widthArr->size() != 1 && widthArr->size() != 2 && widthArr->size() != 4)
+                    {
+                        SetError(error, "candidate_window.border_image.width_dip 必须包含 1、2 或 4 个数值");
+                        return std::nullopt;
+                    }
+                    for (const auto &val : *widthArr)
+                    {
+                        const auto num = val.value<double>();
+                        if (!num || *num < 0.0 || *num > 500.0)
+                        {
+                            SetError(error, "candidate_window.border_image.width_dip 超出范围");
+                            return std::nullopt;
+                        }
+                        bi.widthDip.push_back(*num);
+                    }
+                }
+                bi.fill = (*borderImageTable)["fill"].value_or(true);
+                package.borderImage = bi;
+            }
+
+            if (const toml::node *insetsNode = window->get("content_insets_dip"))
+            {
+                const auto *insetsTable = insetsNode->as_table();
+                if (!insetsTable)
+                {
+                    SetError(error, "candidate_window.content_insets_dip 必须是表");
+                    return std::nullopt;
+                }
+                InsetsDip insets;
+                insets.top = BoundedNumber(*insetsTable, "top", 200.0);
+                insets.right = BoundedNumber(*insetsTable, "right", 500.0);
+                insets.bottom = BoundedNumber(*insetsTable, "bottom", 200.0);
+                insets.left = BoundedNumber(*insetsTable, "left", 500.0);
+                if (insets.top < 0.0 || insets.right < 0.0 || insets.bottom < 0.0 || insets.left < 0.0)
+                {
+                    SetError(error, "candidate_window.content_insets_dip 数值超出范围");
+                    return std::nullopt;
+                }
+                package.contentInsetsDip = insets;
+            }
+
+            if (const toml::node *decorationsNode = window->get("decorations"))
+            {
+                const auto *decorationsArr = decorationsNode->as_array();
+                if (!decorationsArr)
+                {
+                    SetError(error, "candidate_window.decorations 必须是数组");
+                    return std::nullopt;
+                }
+                for (const auto &decNode : *decorationsArr)
+                {
+                    const auto *decTable = decNode.as_table();
+                    FreeDecoration dec;
+                    if (!decTable || !decTable->contains("image") || !ReadResource(*decTable, "image", dec.image))
+                    {
+                        SetError(error, "candidate_window.decorations.image 无效");
+                        return std::nullopt;
+                    }
+                    if (decTable->contains("anchor") &&
+                        !ReadEnum(*decTable, "anchor",
+                                  {"top-left", "top-right", "bottom-left", "bottom-right", "left", "right", "top",
+                                   "bottom", "center"},
+                                  dec.anchor))
+                    {
+                        SetError(error, "candidate_window.decorations.anchor 无效");
+                        return std::nullopt;
+                    }
+                    const auto offsetX = decTable->get("offset_x_dip")->value<double>();
+                    dec.offsetXDip = offsetX ? *offsetX : 0.0;
+                    const auto offsetY = decTable->get("offset_y_dip")->value<double>();
+                    dec.offsetYDip = offsetY ? *offsetY : 0.0;
+                    dec.widthDip = BoundedNumber(*decTable, "width_dip", 2000.0);
+                    dec.heightDip = BoundedNumber(*decTable, "height_dip", 2000.0);
+                    const auto z = decTable->get("z_index")->value<int64_t>();
+                    dec.zIndex = z ? static_cast<int>(*z) : 2;
+                    if (dec.widthDip <= 0.0 || dec.heightDip <= 0.0)
+                    {
+                        SetError(error, "candidate_window.decorations 的 width_dip 与 height_dip 必须大于 0");
+                        return std::nullopt;
+                    }
+                    package.freeDecorations.push_back(dec);
+                }
+            }
+        }
+
         const auto *candidate = root["candidate"].as_table();
         if (candidate && (!ReadColors((*candidate)["dark"].as_table(), package.dark) ||
                           !ReadColors((*candidate)["light"].as_table(), package.light)))
@@ -483,6 +600,21 @@ std::optional<Package> Load(const std::filesystem::path &skinsRoot, const std::s
         {
             SetError(error, "找不到 candidate_window.background.image 文件");
             return std::nullopt;
+        }
+        if (package.borderImage && !package.borderImage->source.empty() &&
+            !std::filesystem::is_regular_file(directory / std::filesystem::u8path(package.borderImage->source), ec))
+        {
+            SetError(error, "找不到 candidate_window.border_image.source 文件");
+            return std::nullopt;
+        }
+        for (const auto &dec : package.freeDecorations)
+        {
+            if (!dec.image.empty() &&
+                !std::filesystem::is_regular_file(directory / std::filesystem::u8path(dec.image), ec))
+            {
+                SetError(error, "找不到 candidate_window.decorations.image 文件");
+                return std::nullopt;
+            }
         }
         return package;
     }
