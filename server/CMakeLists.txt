@@ -269,6 +269,8 @@ set(SRC_FILES
     "./src/webview2/windows_webview2.h"
     "./src/window/candidate_presenter.cpp"
     "./src/window/candidate_presenter.h"
+    "./src/window/candidate_skin_overlay.cpp"
+    "./src/window/candidate_skin_overlay.h"
     "./src/window/candidate_skin_palette.cpp"
     "./src/window/candidate_skin_palette.h"
     "./src/window/tray_menu_presenter.cpp"

@@ -38,6 +38,45 @@ double GetActiveCandidateSkinDecorationWidthDip()
     return activeExternalCandidateSkin ? activeExternalCandidateSkin->decorationWidthDip : 0.0;
 }
 
+namespace
+{
+double ActiveOuterInset(bool top, bool right, bool bottom)
+{
+    if (!activeExternalCandidateSkin || !activeExternalCandidateSkin->outerInsetsDip)
+    {
+        return 0.0;
+    }
+    const CandidateSkinCatalog::InsetsDip &insets = *activeExternalCandidateSkin->outerInsetsDip;
+    if (top)
+        return insets.top;
+    if (right)
+        return insets.right;
+    if (bottom)
+        return insets.bottom;
+    return insets.left;
+}
+} // namespace
+
+double GetActiveCandidateSkinOuterTopDip()
+{
+    return ActiveOuterInset(true, false, false);
+}
+
+double GetActiveCandidateSkinOuterRightDip()
+{
+    return ActiveOuterInset(false, true, false);
+}
+
+double GetActiveCandidateSkinOuterBottomDip()
+{
+    return ActiveOuterInset(false, false, true);
+}
+
+double GetActiveCandidateSkinOuterLeftDip()
+{
+    return ActiveOuterInset(false, false, false);
+}
+
 std::wstring ReadHtmlFile(const std::wstring &filePath)
 {
     std::ifstream file(filePath, std::ios::binary);
@@ -396,36 +435,27 @@ std::wstring BuildExternalCandidateSkinCss(const CandidateSkinCatalog::Package &
     }
     if (skin.borderImage)
     {
-        // v2 专有九宫格贴图边框
+        // v2 专有九宫格贴图边框。stretch_dip 给出时它才是可拉伸区，语义比 slice_dip 直白：
+        // 面板图里画死的装饰放在它之外就保持 1:1，不会被横向拉长。
         const auto &bi = *skin.borderImage;
+        const std::vector<double> &sliceSrc = bi.stretchDip.empty() ? bi.sliceDip : bi.stretchDip;
         std::wstring sliceStr;
-        for (size_t i = 0; i < bi.sliceDip.size(); ++i)
+        for (size_t i = 0; i < sliceSrc.size(); ++i)
         {
             if (i > 0)
                 sliceStr += L" ";
-            sliceStr += fmt::format(L"{}", bi.sliceDip[i]);
+            sliceStr += fmt::format(L"{}", sliceSrc[i]);
         }
         if (bi.fill)
             sliceStr += L" fill";
 
+        const std::vector<double> &widthSrc = bi.widthDip.empty() ? sliceSrc : bi.widthDip;
         std::wstring widthStr;
-        if (!bi.widthDip.empty())
+        for (size_t i = 0; i < widthSrc.size(); ++i)
         {
-            for (size_t i = 0; i < bi.widthDip.size(); ++i)
-            {
-                if (i > 0)
-                    widthStr += L" ";
-                widthStr += fmt::format(L"{}px", bi.widthDip[i]);
-            }
-        }
-        else
-        {
-            for (size_t i = 0; i < bi.sliceDip.size(); ++i)
-            {
-                if (i > 0)
-                    widthStr += L" ";
-                widthStr += fmt::format(L"{}px", bi.sliceDip[i]);
-            }
+            if (i > 0)
+                widthStr += L" ";
+            widthStr += fmt::format(L"{}px", widthSrc[i]);
         }
 
         css.append(L".container:not(:empty) { border-style: solid; border-image-source: ");
@@ -439,9 +469,42 @@ std::wstring BuildExternalCandidateSkinCss(const CandidateSkinCatalog::Package &
     }
     if (skin.contentInsetsDip)
     {
+        // 四值展开成「上右下左」，1 值全边、2 值纵横、4 值四边，与 CSS 一致。
+        const auto expand4 = [](const std::vector<double> &v, double out[4]) {
+            if (v.size() == 1)
+                out[0] = out[1] = out[2] = out[3] = v[0];
+            else if (v.size() == 2)
+            {
+                out[0] = out[2] = v[0];
+                out[1] = out[3] = v[1];
+            }
+            else
+            {
+                for (size_t i = 0; i < 4; ++i)
+                    out[i] = i < v.size() ? v[i] : 0.0;
+            }
+        };
+        double borderPx[4] = {0.0, 0.0, 0.0, 0.0};
+        if (skin.borderImage)
+        {
+            const auto &bi = *skin.borderImage;
+            const std::vector<double> &widthSrc =
+                bi.widthDip.empty() ? (bi.stretchDip.empty() ? bi.sliceDip : bi.stretchDip) : bi.widthDip;
+            expand4(widthSrc, borderPx);
+        }
+        // content_insets_dip 从面板外缘量起，而 CSS 的 padding 从边框内缘起算，这里把边框宽度扣掉。
         const auto &insets = *skin.contentInsetsDip;
-        css.append(fmt::format(L".container:not(:empty) {{ padding: {}px {}px {}px {}px !important; }}\n", insets.top,
-                               insets.right, insets.bottom, insets.left));
+        const double raw[4] = {insets.top, insets.right, insets.bottom, insets.left};
+        double padding[4] = {0.0, 0.0, 0.0, 0.0};
+        for (size_t i = 0; i < 4; ++i)
+            padding[i] = (std::max)(0.0, raw[i] - borderPx[i]);
+        css.append(fmt::format(L".container:not(:empty) {{ padding: {}px {}px {}px {}px !important; }}\n", padding[0],
+                               padding[1], padding[2], padding[3]));
+    }
+    if (skin.lineGapDip)
+    {
+        // 预编辑行与候选行之间的行距。基础皮肤把它并进 .row 的上下边距，这里显式覆盖。
+        css.append(fmt::format(L".row.pinyin {{ margin-bottom: {}px; }}\n", *skin.lineGapDip));
     }
     // 自由挂件只能是 ::before / ::after 两层：候选框页面里没有可承载任意数量挂件的元素。
     // 需要更多层时要把挂件元素注入容器，那属于另一处改动。

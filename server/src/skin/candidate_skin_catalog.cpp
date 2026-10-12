@@ -474,6 +474,24 @@ std::optional<Package> Load(const std::filesystem::path &skinsRoot, const std::s
                     }
                     bi.sliceDip.push_back(*num);
                 }
+                if (const auto *stretchArr = (*borderImageTable)["stretch_dip"].as_array())
+                {
+                    if (stretchArr->size() != 1 && stretchArr->size() != 2 && stretchArr->size() != 4)
+                    {
+                        SetError(error, "candidate_window.border_image.stretch_dip 必须包含 1、2 或 4 个数值");
+                        return std::nullopt;
+                    }
+                    for (const auto &val : *stretchArr)
+                    {
+                        const auto num = val.value<double>();
+                        if (!num || *num < 0.0 || *num > 500.0)
+                        {
+                            SetError(error, "candidate_window.border_image.stretch_dip 超出范围");
+                            return std::nullopt;
+                        }
+                        bi.stretchDip.push_back(*num);
+                    }
+                }
                 if (const auto *widthArr = (*borderImageTable)["width_dip"].as_array())
                 {
                     if (widthArr->size() != 1 && widthArr->size() != 2 && widthArr->size() != 4)
@@ -515,6 +533,33 @@ std::optional<Package> Load(const std::filesystem::path &skinsRoot, const std::s
                     return std::nullopt;
                 }
                 package.contentInsetsDip = insets;
+            }
+
+            if (!ReadOptionalBounded(*window, "line_gap_dip", 100.0, package.lineGapDip))
+            {
+                SetError(error, "candidate_window.line_gap_dip 超出范围");
+                return std::nullopt;
+            }
+
+            if (const toml::node *outerNode = window->get("outer_insets_dip"))
+            {
+                const auto *outerTable = outerNode->as_table();
+                if (!outerTable)
+                {
+                    SetError(error, "candidate_window.outer_insets_dip 必须是表");
+                    return std::nullopt;
+                }
+                InsetsDip outer;
+                outer.top = BoundedNumber(*outerTable, "top", 500.0);
+                outer.right = BoundedNumber(*outerTable, "right", 500.0);
+                outer.bottom = BoundedNumber(*outerTable, "bottom", 500.0);
+                outer.left = BoundedNumber(*outerTable, "left", 500.0);
+                if (outer.top < 0.0 || outer.right < 0.0 || outer.bottom < 0.0 || outer.left < 0.0)
+                {
+                    SetError(error, "candidate_window.outer_insets_dip 数值超出范围");
+                    return std::nullopt;
+                }
+                package.outerInsetsDip = outer;
             }
 
             if (const toml::node *decorationsNode = window->get("decorations"))

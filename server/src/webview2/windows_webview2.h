@@ -75,6 +75,11 @@ bool ApplyConfiguredFloatingToolbarAppearance(std::function<void()> onComplete);
 // Geometry declared by the active external skin package. Built-in skins return 0.
 double GetActiveCandidateSkinDecorationTopDip();
 double GetActiveCandidateSkinDecorationWidthDip();
+// v2 皮肤为挂在卡片外沿的挂件声明的预留空白（DIP）。没有就返回 0。
+double GetActiveCandidateSkinOuterTopDip();
+double GetActiveCandidateSkinOuterRightDip();
+double GetActiveCandidateSkinOuterBottomDip();
+double GetActiveCandidateSkinOuterLeftDip();
 // Push half-monitor CSS max width/height (DIP) into a small-window page.
 void InjectSurfaceViewportLimits(ICoreWebView2 *webview, HWND hwnd);
 // WebView2 rasterization scale includes both monitor DPI and the user's text

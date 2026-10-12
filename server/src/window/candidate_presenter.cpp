@@ -8,6 +8,7 @@
 #include "ipc/ipc.h"
 #include "log/candidate_diag_log.h"
 #include "skin/candidate_skin_catalog.h"
+#include "window/candidate_skin_overlay.h"
 #include "utils/common_utils.h"
 #include "utils/ime_utils.h"
 #include "utils/window_utils.h"
@@ -335,6 +336,9 @@ struct CandidatePresenter::Impl
     std::shared_ptr<msimeui::StackPanel> root;
     std::shared_ptr<msimeui::Image> decoration;
     std::shared_ptr<msimeui::Card> card;
+    // 卡片与 v2 挂件层放在同一格里：挂件层测量为 0，格子仍由卡片决定，挂件按 anchor 画到卡片外沿。
+    std::shared_ptr<msimeui::Grid> overlayGrid;
+    std::shared_ptr<CandidateSkinOverlay> skinOverlay;
     // 装饰图与卡片同列：列宽即卡片宽，装饰图在列内按 align 对齐，对应 CSS 里
     // .containerParent 为 fit-content、::before 相对它定位。
     std::shared_ptr<msimeui::StackPanel> cardColumn;
@@ -449,11 +453,19 @@ void CandidatePresenter::RebuildScene()
     impl_->card->SetHorizontalAlignment(msimeui::HorizontalAlignment::Leading);
     impl_->card->AddChild(impl_->body);
     impl_->root->SetHorizontalContentAlignment(msimeui::HorizontalAlignment::Leading);
+    impl_->overlayGrid = std::make_shared<msimeui::Grid>();
+    impl_->overlayGrid->AddRow(msimeui::GridLength{msimeui::GridUnitType::Auto, 1.0f});
+    impl_->overlayGrid->AddColumn(msimeui::GridLength{msimeui::GridUnitType::Auto, 1.0f});
+    impl_->overlayGrid->AddChild(impl_->card, 0, 0);
+    impl_->skinOverlay = std::make_shared<CandidateSkinOverlay>();
+    impl_->skinOverlay->SetHorizontalAlignment(msimeui::HorizontalAlignment::Stretch);
+    impl_->skinOverlay->SetVerticalAlignment(msimeui::VerticalAlignment::Stretch);
+    impl_->overlayGrid->AddChild(impl_->skinOverlay, 0, 0);
     impl_->cardColumn = std::make_shared<msimeui::StackPanel>(0.0f);
     impl_->cardColumn->SetHorizontalAlignment(msimeui::HorizontalAlignment::Leading);
     impl_->cardColumn->SetHorizontalContentAlignment(msimeui::HorizontalAlignment::Stretch);
     impl_->cardColumn->AddChild(impl_->decoration);
-    impl_->cardColumn->AddChild(impl_->card);
+    impl_->cardColumn->AddChild(impl_->overlayGrid);
     impl_->frame = std::make_shared<msimeui::Container>();
     impl_->frame->SetPadding({kShadowPadLeft, kShadowPadTop, kShadowPadRight, kShadowPadBottom});
     impl_->frame->SetChild(impl_->cardColumn);
@@ -1000,9 +1012,47 @@ void CandidatePresenter::ApplySkin()
         impl_->decoration->SetHorizontalAlignment(DecorationAlignment(package->decorationAlign));
         framePadTop = (std::max)(0.0f, kShadowPadTop - decorationTopDip_);
     }
+    // v2 挂件挂在卡片外沿，窗口要按 outer_insets_dip 往四边多留出空白，否则立绘被窗口边界裁掉。
+    float framePadLeft = kShadowPadLeft;
+    float framePadRight = kShadowPadRight;
+    float framePadBottom = kShadowPadBottom;
+    if (package && package->outerInsetsDip)
+    {
+        const CandidateSkinCatalog::InsetsDip &outer = *package->outerInsetsDip;
+        framePadLeft += static_cast<float>(outer.left);
+        framePadRight += static_cast<float>(outer.right);
+        framePadTop += static_cast<float>(outer.top);
+        framePadBottom += static_cast<float>(outer.bottom);
+    }
     if (impl_->frame)
     {
-        impl_->frame->SetPadding({kShadowPadLeft, framePadTop, kShadowPadRight, kShadowPadBottom});
+        impl_->frame->SetPadding({framePadLeft, framePadTop, framePadRight, framePadBottom});
+    }
+
+    // v2 自由挂件交给 overlay 层绘制；它测量为 0，不参与卡片布局。
+    if (impl_->skinOverlay)
+    {
+        std::vector<CandidateSkinOverlay::Item> items;
+        if (package)
+        {
+            for (const CandidateSkinCatalog::FreeDecoration &dec : package->freeDecorations)
+            {
+                CandidateSkinOverlay::Item item;
+                item.path = packageRoot + string_to_wstring(dec.image);
+                item.anchor = dec.anchor;
+                item.offsetXDip = static_cast<float>(dec.offsetXDip);
+                item.offsetYDip = static_cast<float>(dec.offsetYDip);
+                item.widthDip = static_cast<float>(dec.widthDip);
+                item.heightDip = static_cast<float>(dec.heightDip);
+                items.push_back(std::move(item));
+            }
+        }
+        impl_->skinOverlay->SetItems(std::move(items));
+    }
+    // v2 的 line_gap_dip 落到预编辑行与候选列表之间的间距上。
+    if (impl_->body)
+    {
+        impl_->body->SetSpacing(package && package->lineGapDip ? static_cast<float>(*package->lineGapDip) : 2.0f);
     }
 
     msimeui::Brush brush;
@@ -1014,10 +1064,48 @@ void CandidatePresenter::ApplySkin()
     if (impl_->card)
     {
         impl_->card->SetBrush(brush);
-        impl_->card->SetPadding(tokens.containerPad);
+        if (package && package->contentInsetsDip)
+        {
+            // v2 的 content_insets_dip 从面板外缘量起，D2D 侧直接落成卡片内边距（这里没有 CSS 的边框内缘概念）。
+            const CandidateSkinCatalog::InsetsDip &insets = *package->contentInsetsDip;
+            impl_->card->SetPadding(msimeui::Thickness{static_cast<float>(insets.left), static_cast<float>(insets.top),
+                                                       static_cast<float>(insets.right),
+                                                       static_cast<float>(insets.bottom)});
+        }
+        else
+        {
+            impl_->card->SetPadding(tokens.containerPad);
+        }
         impl_->card->SetMinWidth(cardMinWidthDip_);
-        impl_->card->SetBackgroundImage(backgroundPath, BackgroundStretch(package ? package->backgroundFit : ""),
-                                        package ? static_cast<float>(package->backgroundOpacity) : 1.0f);
+        if (package && package->borderImage && !package->borderImage->source.empty())
+        {
+            // v2 九宫格：四边原样、其余拉伸。切片按 1/2/4 值展开成「上右下左」。
+            const CandidateSkinCatalog::BorderImage &bi = *package->borderImage;
+            const std::vector<double> &values = bi.stretchDip.empty() ? bi.sliceDip : bi.stretchDip;
+            const auto expand4 = [](const std::vector<double> &v, float out[4]) {
+                if (v.size() == 1)
+                    out[0] = out[1] = out[2] = out[3] = static_cast<float>(v[0]);
+                else if (v.size() == 2)
+                {
+                    out[0] = out[2] = static_cast<float>(v[0]);
+                    out[1] = out[3] = static_cast<float>(v[1]);
+                }
+                else
+                {
+                    for (size_t i = 0; i < 4; ++i)
+                        out[i] = i < v.size() ? static_cast<float>(v[i]) : 0.0f;
+                }
+            };
+            float slice[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+            expand4(values, slice);
+            impl_->card->SetBackgroundImageNineSlice(packageRoot + string_to_wstring(bi.source), slice[3], slice[0],
+                                                     slice[1], slice[2], 1.0f);
+        }
+        else
+        {
+            impl_->card->SetBackgroundImage(backgroundPath, BackgroundStretch(package ? package->backgroundFit : ""),
+                                            package ? static_cast<float>(package->backgroundOpacity) : 1.0f);
+        }
     }
 }
 

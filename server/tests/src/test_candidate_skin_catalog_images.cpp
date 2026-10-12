@@ -223,14 +223,23 @@ themes = ["dark"]
 [candidate_window.border_image]
 source = "assets/border.png"
 slice_dip = [16, 44, 16, 0]
+stretch_dip = [16, 90, 16, 0]
 width_dip = [16, 44, 16, 0]
 fill = true
+
+line_gap_dip = 6
 
 [candidate_window.content_insets_dip]
 top = 4
 right = 130
 bottom = 14
 left = 55
+
+[candidate_window.outer_insets_dip]
+top = 87
+right = 16
+bottom = 4
+left = 0
 
 [[candidate_window.decorations]]
 image = "assets/char.png"
@@ -252,11 +261,21 @@ z_index = 3
     REQUIRE_EQ(package->borderImage->source, std::string("assets/border.png"));
     REQUIRE_EQ(package->borderImage->sliceDip.size(), static_cast<size_t>(4));
     REQUIRE_EQ(package->borderImage->sliceDip[1], 44.0);
+    // stretch_dip 与 slice_dip 分开存：前者才是可拉伸区，渲染时优先用它。
+    REQUIRE_EQ(package->borderImage->stretchDip.size(), static_cast<size_t>(4));
+    REQUIRE_EQ(package->borderImage->stretchDip[1], 90.0);
     REQUIRE(package->borderImage->fill);
 
     REQUIRE(package->contentInsetsDip.has_value());
     REQUIRE_EQ(package->contentInsetsDip->left, 55.0);
     REQUIRE_EQ(package->contentInsetsDip->right, 130.0);
+
+    REQUIRE(package->lineGapDip.has_value());
+    REQUIRE_EQ(*package->lineGapDip, 6.0);
+
+    REQUIRE(package->outerInsetsDip.has_value());
+    REQUIRE_EQ(package->outerInsetsDip->top, 87.0);
+    REQUIRE_EQ(package->outerInsetsDip->right, 16.0);
 
     REQUIRE_EQ(package->freeDecorations.size(), static_cast<size_t>(1));
     REQUIRE_EQ(package->freeDecorations[0].anchor, std::string("right"));

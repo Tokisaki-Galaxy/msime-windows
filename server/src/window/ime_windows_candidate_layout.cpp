@@ -89,6 +89,26 @@ double GetCandidateDecorationWidthDip()
 {
     return GetActiveCandidateSkinDecorationWidthDip();
 }
+
+double GetCandidateOuterTopDip()
+{
+    return GetActiveCandidateSkinOuterTopDip();
+}
+
+double GetCandidateOuterRightDip()
+{
+    return GetActiveCandidateSkinOuterRightDip();
+}
+
+double GetCandidateOuterBottomDip()
+{
+    return GetActiveCandidateSkinOuterBottomDip();
+}
+
+double GetCandidateOuterLeftDip()
+{
+    return GetActiveCandidateSkinOuterLeftDip();
+}
 } // namespace
 
 namespace ime_windows_detail
@@ -104,11 +124,15 @@ int GetCandidatePackingMarginTopDip()
 std::pair<double, double> AddCandidateDecorationToSize(const std::pair<double, double> &cardSize)
 {
     const double decorationTopDip = GetCandidateDecorationTopDip();
-    if (decorationTopDip <= 0.0)
+    std::pair<double, double> size = cardSize;
+    if (decorationTopDip > 0.0)
     {
-        return cardSize;
+        size = {(std::max)(size.first, GetCandidateDecorationWidthDip()), size.second + decorationTopDip};
     }
-    return {(std::max)(cardSize.first, GetCandidateDecorationWidthDip()), cardSize.second + decorationTopDip};
+    // v2 挂件挂在卡片外沿：窗口在卡片四周再各留出一块透明空白，立绘才不会被窗口边界裁掉。
+    size.first += GetCandidateOuterLeftDip() + GetCandidateOuterRightDip();
+    size.second += GetCandidateOuterTopDip() + GetCandidateOuterBottomDip();
+    return size;
 }
 
 int GetCandidateOuterTopPx(int cardAnchorY, int packingTopDip, FLOAT scale)
@@ -117,7 +141,8 @@ int GetCandidateOuterTopPx(int cardAnchorY, int packingTopDip, FLOAT scale)
     {
         scale = 1.0f;
     }
-    const double outerOffsetDip = static_cast<double>(packingTopDip) - GetCandidateDecorationTopDip();
+    const double outerOffsetDip =
+        static_cast<double>(packingTopDip) - GetCandidateDecorationTopDip() - GetCandidateOuterTopDip();
     return cardAnchorY + static_cast<int>(std::lround(outerOffsetDip * static_cast<double>(scale)));
 }
 

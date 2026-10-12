@@ -62,6 +62,9 @@ struct BorderImage
     std::string source;
     // 四边切片大小（DIP）：top, right, bottom, left
     std::vector<double> sliceDip;
+    // 可拉伸区（上右下左，从面板外缘量起）：给出时覆盖 sliceDip。
+    // 面板图里画死的装饰必须落在可拉伸区之外，否则会被横向拉长。
+    std::vector<double> stretchDip;
     // 四边宽度（DIP）：top, right, bottom, left；若为空则沿用 sliceDip
     std::vector<double> widthDip;
     // 是否填充中间内容区域
@@ -132,8 +135,13 @@ struct Package
     ToolbarColors toolbarLight;
     // v2 专有特性：九宫格贴图边框
     std::optional<BorderImage> borderImage;
-    // v2 专有特性：面板内容/文字安全内边距
+    // v2 专有特性：面板内容/文字安全内边距，从面板外缘量起（渲染时扣掉边框宽度）。
     std::optional<InsetsDip> contentInsetsDip;
+    // v2 专有特性：预编辑行与候选行之间的行距（DIP，0–100）；未设置时沿用 base 的行距。
+    std::optional<double> lineGapDip;
+    // v2 专有特性：面板之外需要额外预留的窗口空间（上右下左 DIP），给挂在卡片外沿的挂件用。
+    // 不声明时窗口只按卡片大小开，挂到外面的立绘会被窗口边界裁掉。
+    std::optional<InsetsDip> outerInsetsDip;
     // v2 专有特性：多层自由锚定挂件（支持动图）
     std::vector<FreeDecoration> freeDecorations;
 };
