@@ -1,12 +1,12 @@
 # 外部皮肤 manifest（TOML）
 
-每个皮肤目录需要 `skin.toml`，`id` 必须与文件夹名一致。`schema_version` 当前为 `1`。
+每个皮肤目录需要 `skin.toml`，`id` 必须与文件夹名一致。`schema_version` 支持 `1` 与 `2`（v2 为面向全贴图与复杂立绘皮肤的高级规范，仅在 WebView2 端全面启用，Direct2D 原生端保底降级）。
 
 候选框和悬浮工具栏都由 `skin.toml` 声明，不要再提供 `cand.css` 或工具栏 CSS。所有图片路径都相对于皮肤目录，且不能指向目录之外。
 
 ## 顶层字段
 
-- 必填：`schema_version`、`id`、`name`、`version`、`base`（继承的内置皮肤：`fluent`、`wechat`、`graphite`、`willow_green`、`autumn_osmanthus`、`microsoft`）
+- 必填：`schema_version`（`1` 或 `2`）、`id`、`name`、`version`、`base`（继承的内置皮肤：`fluent`、`wechat`、`graphite`、`willow_green`、`autumn_osmanthus`、`microsoft`）
 - 可选：`author`、`description`
 - `[supports]`：`layouts`（`horizontal` / `vertical`）、`themes`（`dark` / `light`）
 - `[license]`：`code`、`assets`
@@ -37,6 +37,31 @@
 - `image`：图片路径
 - `fit`：`cover`（铺满裁切）| `contain`（完整显示）| `stretch`（拉伸）
 - `opacity`：`0`–`1`
+
+### `[candidate_window.border_image]`（v2 可选，仅 WebView2）
+
+九宫格背景拉伸，面板整体贴图，用于全贴图与复杂纹理面板。
+
+- `source`：图片路径（如 `assets/skin1.png`，支持 APNG/WebP/PNG）
+- `slice_dip`：`[top, right, bottom, left]` 切片线位置，正数数组，支持 1~4 个值
+- `width_dip`：可选，边框绘制宽度，支持 1~4 个值
+- `fill`：可选，布尔值，是否保留九宫格中心内容区域，默认为 `true`
+
+### `[candidate_window.content_insets_dip]`（v2 可选，仅 WebView2）
+
+候选框内容与文字的安全内边距，避开贴图四周自带的花纹或立绘。
+
+- `top` / `right` / `bottom` / `left`：四边内边距浮点数
+
+### `[[candidate_window.decorations]]`（v2 可选，数组表，仅 WebView2）
+
+自由锚定立绘挂件层，支持叠加多层角色立绘与 APNG 动图。
+
+- `image`：图片路径
+- `anchor`：`top-left` | `top-right` | `bottom-left` | `bottom-right` | `right` | `left`
+- `width_dip` / `height_dip`：挂件的尺寸
+- `offset_x_dip` / `offset_y_dip`：相对锚定点的水平与垂直偏移（支持负值外挂溢出）
+- `z_index`：层级，默认为 `2`
 
 ## `[candidate.dark]` / `[candidate.light]`
 

@@ -18,7 +18,7 @@ class ManifestTests(unittest.TestCase):
         for path in manifests:
             with self.subTest(skin=path.parent.name):
                 data = tomllib.loads(path.read_text(encoding="utf-8"))
-                self.assertEqual(data["schema_version"], 1)
+                self.assertIn(data["schema_version"], (1, 2))
                 self.assertEqual(data["id"], path.parent.name)
                 self.assertRegex(data["id"], r"^[a-z0-9._-]{1,64}$")
                 # Mirrors the Server catalog: name, version and base are required, author is not.
@@ -30,6 +30,11 @@ class ManifestTests(unittest.TestCase):
                 for table in ("decoration", "background"):
                     if table in window:
                         assets[f"candidate_window.{table}.image"] = window[table]["image"]
+                if "border_image" in window:
+                    assets["candidate_window.border_image.source"] = window["border_image"]["source"]
+                for i, dec in enumerate(window.get("decorations", [])):
+                    if "image" in dec:
+                        assets[f"candidate_window.decorations[{i}].image"] = dec["image"]
                 if "decoration" in window:
                     for key in ("top_inset_dip", "width_dip"):
                         self.assertGreater(window["decoration"][key], 0, key)
