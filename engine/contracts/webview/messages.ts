@@ -19,6 +19,7 @@ export type ClientMessage =
   | { "type": "restartServer"; "protocolVersion"?: 1 }
   | { "type": "copyText"; "protocolVersion"?: 1; "data": string }
   | { "type": "openExternalUrl"; "protocolVersion"?: 1; "data": string }
+  | { "type": "installUpdate"; "protocolVersion"?: 1; "data": string }
   | { "type": "dragStart"; "protocolVersion"?: 1 }
   | { "type": "focus"; "protocolVersion"?: 1 }
   | { "type": "resizeStart"; "protocolVersion"?: 1; "data": "left" | "right" | "top" | "bottom" | "left-top" | "right-top" | "left-bottom" | "right-bottom" | "client" }
@@ -95,6 +96,7 @@ export type SettingsMessage =
   | { "type": "restartServer"; "protocolVersion"?: 1 }
   | { "type": "copyText"; "protocolVersion"?: 1; "data": string }
   | { "type": "openExternalUrl"; "protocolVersion"?: 1; "data": string }
+  | { "type": "installUpdate"; "protocolVersion"?: 1; "data": string }
   | { "type": "dragStart"; "protocolVersion"?: 1 }
   | { "type": "focus"; "protocolVersion"?: 1 }
   | { "type": "resizeStart"; "protocolVersion"?: 1; "data": "left" | "right" | "top" | "bottom" | "left-top" | "right-top" | "left-bottom" | "right-bottom" | "client" }

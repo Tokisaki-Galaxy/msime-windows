@@ -224,6 +224,9 @@ std::string g_candidate_fixed_badge_style = "paperclip";
 std::string g_candidate_ai_badge_style = "robot";
 std::string g_settings_window_linger = "off";
 bool g_settings_launch_animation = true;
+// 发现新版本时由后台自动下载安装包并校验。出厂关闭：自动下载会占带宽和磁盘，
+// 属于要用户主动打开的行为。
+bool g_auto_download_update = false;
 std::string g_theme_mode = "system";
 std::string g_theme_settings = "follow";
 std::string g_theme_cand = "follow";
@@ -825,6 +828,7 @@ bool LoadImeConfig()
             g_settings_window_linger = IsValidSettingsWindowLinger(linger) ? linger : "off";
         }
         g_settings_launch_animation = tbl["appearance"]["settings_launch_animation"].value_or(true);
+        g_auto_download_update = tbl["appearance"]["auto_download_update"].value_or(false);
         {
             const std::string theme_mode = tbl["appearance"]["theme_mode"].value_or(std::string("system"));
             if (theme_mode == "light" || theme_mode == "system" || theme_mode == "auto")

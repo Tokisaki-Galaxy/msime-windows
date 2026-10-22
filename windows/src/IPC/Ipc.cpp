@@ -1724,6 +1724,44 @@ bool SendToAuxNamedpipe(const std::wstring &pipeData, bool waitForAcknowledgemen
     return acknowledged;
 }
 
+bool PromptUpdateInstaller(const std::wstring &payload)
+{
+    // 载荷四段：版本号、安装包绝对路径、安装包文件名、发布页地址。缺任何一段都不弹窗：
+    // 这正是「服务端状态坏了」的表现，静默跳过比弹一个点不动的窗口好。
+    std::vector<std::wstring> fields;
+    size_t start = 0;
+    while (start <= payload.size())
+    {
+        const size_t tab = payload.find(L'\t', start);
+        const size_t end = tab == std::wstring::npos ? payload.size() : tab;
+        fields.push_back(payload.substr(start, end - start));
+        if (tab == std::wstring::npos)
+            break;
+        start = tab + 1;
+    }
+    if (fields.size() != 4 || fields[0].empty() || fields[1].empty() || fields[2].empty())
+    {
+        return false;
+    }
+
+    const std::wstring &version = fields[0];
+    const std::wstring &installer = fields[2];
+    std::wstring text = L"新版本 v" + version + L" 已经下载完成并通过校验。\n\n现在安装吗？\n\n";
+    text += L"安装会先退出输入法后台进程，随后打开安装程序；在安装界面里点完成即可。";
+    const int answer =
+        MessageBoxW(nullptr, text.c_str(), L"水杉输入法", MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND | MB_TOPMOST);
+    if (answer != IDYES)
+    {
+        // 用户点了「否」：什么都不发，服务端下次轮询发现包还在就直接再问一遍。
+        return true;
+    }
+    // 只把文件名回给 Server：真正的路径由它从自己的状态里推出来，消息里带的东西不当作
+    // 路径使用，越权路径在这里没有入口。Server 会在拉起安装程序后退出，让安装程序
+    // 拿得到 TSF DLL。
+    SendToAuxNamedpipe(L"InstallUpdate|" + installer);
+    return true;
+}
+
 /**
  * event_type
  *   0: FanyImeKeyEvent

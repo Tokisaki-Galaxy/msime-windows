@@ -2,6 +2,8 @@
 
 #include <Windows.h>
 #include <filesystem>
+#include <regex>
+#include <string>
 
 #pragma comment(lib, "Shell32.lib")
 
@@ -56,6 +58,22 @@ bool ActivateSettingsWindow(HWND window, UINT message)
     return true;
 }
 } // namespace
+
+bool LaunchUpdateInstaller(const std::string &installer_path)
+{
+    // 自动下载的安装包落在数据目录里，文件名固定。只接受这种形状，且必须真的存在：
+    // 消息内容来自我们自己写下的状态，但路径检查不该依赖这一点。
+    static const std::regex installer_name(R"(^MetasequoiaIME_Setup_v[\w.-]+\.exe$)", std::regex::icase);
+    const std::filesystem::path path = std::filesystem::u8path(installer_path);
+    if (!std::regex_match(path.filename().u8string(), installer_name))
+        return false;
+    if (!std::filesystem::is_regular_file(path))
+        return false;
+    // 安装程序要提权，交给 ShellExecute 走 UAC；不放参数，让用户在 Inno Setup 里自己确认。
+    const HINSTANCE result =
+        ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, path.parent_path().c_str(), SW_SHOWNORMAL);
+    return reinterpret_cast<INT_PTR>(result) > 32;
+}
 
 bool OpenSettingsApplication()
 {

@@ -394,6 +394,14 @@ void CheckForUpdate(PageContext &context, const std::shared_ptr<AboutState> &sta
 }
 } // namespace
 
+// 本机这条通道参不参与自动更新。dev 构建和认不出的版本号都不参与，勾选框也就不出现：
+// 给一个勾了也没用的开关比没有更糟。
+bool AutoUpdateAvailable(const PageContext &context)
+{
+    const std::string channel = context.model.GetString("updates.channel");
+    return channel == "release" || channel == "nightly";
+}
+
 VisualPtr BuildAboutPage(PageContext &context)
 {
     PageBuilder page(L"关于");
@@ -439,7 +447,16 @@ VisualPtr BuildAboutPage(PageContext &context)
             if (auto locked = weak.lock())
                 CheckForUpdate(*ctx, locked);
         });
-        links->Add(std::make_shared<AboutRow>(left, state->check, false));
+        // 勾选框只在这条通道真的能自动更新时出现：dev 构建永远不参与。
+        // 与按钮同排、垂直居中；勾选框在左。
+        auto updateActions = std::make_shared<Row>(10.0f);
+        updateActions->SetAlign(Row::Align::Center);
+        if (AutoUpdateAvailable(context))
+        {
+            updateActions->Add(BindToggle(context, "appearance.auto_download_update"));
+        }
+        updateActions->Add(state->check);
+        links->Add(std::make_shared<AboutRow>(left, updateActions, false));
     }
     struct Link
     {

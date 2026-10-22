@@ -98,6 +98,7 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_voice_providers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ai_vendor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ai_provider_store.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_update_channel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_reasoning_strip.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_voice_batch_protocol.cpp"
     "${CMAKE_SOURCE_DIR}/src/voice-input/voice_batch_protocol.cpp"
@@ -163,6 +164,10 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/utils/hanzi_pinyin.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/ime_paths.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/network_proxy.cpp"
+    # 版本通道解析、安装包名与摘要校验、状态文件读写都要能在没有网络的情况下测，
+    # 所以这里链接真实的两个翻译单元，而不是在测试里复述一遍规则。
+    "${CMAKE_SOURCE_DIR}/src/settings/update_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/update_download.cpp"
     "${CMAKE_SOURCE_DIR}/src/settings/dictionary_validation.cpp"
     # The catalog/download/delete behaviors under test live in collocation_model.cpp, so the
     # activation-fallback and id-guard cases link the real translation unit.

@@ -125,6 +125,10 @@ int SendLangbarRightClickEventToUIProcessViaNamedPipe(const RECT *prcArea);
 // separated). Used in UILess mode so ITfCandidateListUIElement::GetString can
 // return real candidates after PrepareCandidateList has written shared memory.
 bool TryReadCandidatePageFromSharedMemory(_Out_ std::wstring *candidatePage);
+// 自动下载的安装包已经下好并校验通过。由 Server 通过 worker 管道广播，所有参数都来自
+// 本机写下的状态；这里只负责询问用户，不联网、不读文件、不启动任何程序。返回 true 表示
+// 这次真的弹了窗，调用方据此决定是否需要等待用户答复。
+bool PromptUpdateInstaller(const std::wstring &payload);
 // When abortTransportOnTimeout is false, a missed reply leaves the pipe up and
 // returns a non-TransportUnavailable empty frame for the caller to fall back.
 struct FanyImeNamedpipeDataToTsf *TryReadDataFromServerPipeWithTimeout(uint64_t expectedRequestId,

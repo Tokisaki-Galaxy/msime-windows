@@ -479,7 +479,14 @@ constexpr std::uint32_t EnumerationCommaKeysChanged = 38;
 // FanyImePipeFlags::HorizontalArrowSelection and applies the Server's answer instead of moving the caret itself.
 // Older DLLs ignore the opcode and keep moving the caret.
 constexpr std::uint32_t HorizontalArrowSelectionChanged = 39;
-constexpr std::uint32_t MaxKnown = HorizontalArrowSelectionChanged;
+// The Server has a new installer whose checksum matched. Payload is empty for "nothing to
+// install", otherwise four tab-separated fields: version, absolute installer path, installer file
+// name, release page URL. The TSF side only asks the user and, on agreement, sends the
+// "updateInstall" Aux notification naming the path; it launches nothing itself, so both the TSF
+// client and the settings page follow one code path. Broadcast to every connected client instead
+// of only the active one: the download usually finishes while the user types elsewhere.
+constexpr std::uint32_t UpdateInstallerReady = 40;
+constexpr std::uint32_t MaxKnown = UpdateInstallerReady;
 // Source compatibility for the Server's historical spellings.
 constexpr std::uint32_t SwitchToEn = SwitchToEnglish;
 constexpr std::uint32_t SwitchToCn = SwitchToChinese;

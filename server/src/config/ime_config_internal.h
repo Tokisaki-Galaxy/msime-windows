@@ -263,6 +263,7 @@ extern std::string g_candidate_fixed_badge_style;
 extern std::string g_candidate_ai_badge_style;
 extern std::string g_settings_window_linger;
 extern bool g_settings_launch_animation;
+extern bool g_auto_download_update;
 extern std::string g_theme_mode;
 extern std::string g_theme_settings;
 extern std::string g_theme_cand;

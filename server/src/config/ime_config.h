@@ -686,6 +686,9 @@ bool SetConfiguredSettingsWindowLinger(const std::string &linger);
 // 设置窗口的齿轮启动画面，出厂开启。
 bool GetConfiguredSettingsLaunchAnimation();
 bool SetConfiguredSettingsLaunchAnimation(bool enabled);
+// 发现新版本时由后台自动下载安装包并校验 SHA256，出厂关闭。
+bool GetConfiguredAutoDownloadUpdate();
+bool SetConfiguredAutoDownloadUpdate(bool enabled);
 // "fluent" | "wechat" | "wechat_scroll" | "graphite" | "willow_green" | "autumn_osmanthus" | "microsoft"
 // — candidate-window and floating-toolbar skin.
 const std::string &GetConfiguredCandidateSkin();

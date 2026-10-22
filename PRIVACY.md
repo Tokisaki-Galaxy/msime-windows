@@ -16,7 +16,7 @@ Every claim below is checkable against this repository. Where a default matters,
 
 **Voice input requires a token you supply.** `[voice_input] voice_input` ships as `true` with a placeholder ASR token, so the hotkeys do nothing over the network until a real token is entered. Once configured, recorded audio is uploaded to the configured endpoint — Doubao (`wss://openspeech.bytedance.com/...`), OpenAI, SiliconFlow or Groq. If text polishing is enabled, the returned transcript is additionally sent to the configured Chat Completions endpoint.
 
-**The update check runs only when you press the button.** 设置 → 关于 → 检查更新 fetches `https://msime.app/update.json` and compares the version. There is no background or scheduled update check, and the request carries no identifier beyond the IP address and a cache-busting timestamp.
+**The update check runs only when you press the button, unless you turn on auto-download.** 设置 → 关于 → 检查更新 fetches `https://msime.app/update.json` and compares the version. Turning on the checkbox next to that button lets the input method (Server process, not the settings window) check the same URL on its own twice a day while it runs, and download the installer when a newer build of the same channel exists. Turning the checkbox off stops that; nothing is checked in the background. Neither path carries an identifier beyond the IP address and a cache-busting timestamp. Auto-download only follows the channel the running build came from: a release follows releases, a nightly build follows nightlies, and development builds never auto-download.
 
 ## No telemetry
 

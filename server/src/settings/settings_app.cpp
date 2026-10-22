@@ -2,6 +2,7 @@
 #include "config/ime_config.h"
 #include "engine/core/data_path.h"
 #include "global/globals.h"
+#include "msime_version.h"
 #include "resource/resource.h"
 #include "settings/settings_launcher.h"
 #include "settings/api_credential_test.h"
@@ -10,6 +11,8 @@
 #include "settings/default_input_method.h"
 #include "settings/game_compat_name.h"
 #include "settings/dictionary_manager.h"
+#include "settings/update_download.h"
+#include "settings/update_channel.h"
 #include "settings/native/native_settings_window.h"
 
 #include "msimeui/DeviceResources.h"
@@ -490,6 +493,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
           {"appearance",
            {{"settings_window_linger", GetConfiguredSettingsWindowLinger()},
             {"settings_launch_animation", GetConfiguredSettingsLaunchAnimation()},
+            {"auto_download_update", GetConfiguredAutoDownloadUpdate()},
             {"candidate_window_layout", GetConfiguredCandidateWindowLayout()},
             {"candidate_window_follow_cursor", GetConfiguredCandidateWindowFollowCursor()},
             {"candidate_window_fit_content", GetConfiguredCandidateWindowFitContent()},
@@ -630,6 +634,25 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
     payload["data"]["helpcode"]["custom_directory"] = GetCustomHelpcodeDirectory();
     payload["data"]["input"]["custom_shuangpin_schemas"] = CustomShuangpinSchemasJson();
     payload["data"]["input"]["custom_shuangpin_directory"] = GetCustomShuangpinDirectory();
+    // 自动下载的结果：服务端下好并校验过的安装包版本号。空串表示没有可安装的包。
+    // 设置页据此在关于页给出提示；下载进度不塞进快照，由页面自己读 status.json。
+    const update_download::Progress status = update_download::ReadStatus();
+    std::string ready_version;
+    std::string ready_installer;
+    update_channel::Version current_version;
+    update_channel::Version ready;
+    if (status.state == update_download::State::Ready &&
+        update_channel::Parse(MSIME_PRODUCT_VERSION, current_version) && update_channel::Parse(status.version, ready) &&
+        ready.kind == current_version.kind && update_channel::Compare(ready, current_version) > 0 &&
+        !update_download::InstallerPathFor(status.version, status.installer).empty())
+    {
+        ready_version = status.version;
+        ready_installer = status.installer;
+    }
+    payload["data"]["updates"] = {{"ready_version", ready_version}, {"ready_installer", ready_installer}};
+    // 设置页要用它判断「这条通道能不能自动更新」：dev 构建和认不出的标签都不参与，
+    // 页面据此决定渲染不渲染勾选框。
+    payload["data"]["updates"]["channel"] = update_channel::ChannelNameOf(MSIME_PRODUCT_VERSION);
     payload["protocolVersion"] = metasequoia::webview::Version;
     const std::string serialized = payload.dump();
     if (!metasequoia::webview::Validate(json::parse(serialized), "server"))
@@ -740,6 +763,8 @@ bool ApplyConfigUpdate(const json::object &data)
         return SetConfiguredSettingsWindowLinger(json::value_to<std::string>(data.at("value")));
     if (path == "appearance.settings_launch_animation")
         return SetConfiguredSettingsLaunchAnimation(json::value_to<bool>(data.at("value")));
+    if (path == "appearance.auto_download_update")
+        return SetConfiguredAutoDownloadUpdate(json::value_to<bool>(data.at("value")));
     if (path == "appearance.candidate_window_layout")
         return SetConfiguredCandidateWindowLayout(json::value_to<std::string>(data.at("value")));
     if (path == "appearance.candidate_window_follow_cursor")
@@ -1536,6 +1561,22 @@ void HandleClientMessage(HWND hwnd, const std::string &raw)
             const std::string url = json::value_to<std::string>(value.at("data"));
             if (url.rfind("https://", 0) == 0)
                 ShellExecuteW(hwnd, L"open", string_to_wstring(url).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        }
+        else if (type == "installUpdate")
+        {
+            // 服务端已经把安装包下好并校验过了，路径与文件名都在它写下的状态里。这里拉起
+            // 安装程序之后必须让本进程真正退出：驻留期间它会一直占着设置窗口，用户重装完
+            // 再打开就成了两个实例。
+            const std::string installer = json::value_to<std::string>(value.at("data"));
+            if (LaunchUpdateInstaller(installer))
+            {
+                CloseSettings(hwnd);
+            }
+            else
+            {
+                MessageBoxW(g_settings_hwnd, L"无法启动安装程序，请到数据目录的 updates 文件夹里手动运行。",
+                            L"水杉输入法", MB_OK | MB_ICONWARNING);
+            }
         }
         else if (type == "copyText")
         {

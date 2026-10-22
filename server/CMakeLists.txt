@@ -259,6 +259,17 @@ set(SRC_FILES
     "./src/ipc/voice_composition_pipe.h"
     "./src/ipc/voice_control_dispatch.cpp"
     "./src/ipc/voice_control_dispatch.h"
+    # collocation 的两个源此前只挂在设置目标上，Server 目标里 main.cpp 与
+    # event_listener_candidates.cpp 却引用了它，链接时找不到符号。两个目标都要。
+    "./src/settings/collocation_model.cpp"
+    "./src/settings/collocation_model.h"
+    # 自动下载安装包的后台轮询只跑在 Server 上：它常驻，关掉设置窗口也不中断。
+    "./src/settings/update_channel.cpp"
+    "./src/settings/update_channel.h"
+    "./src/settings/update_download.cpp"
+    "./src/settings/update_download.h"
+    "./src/settings/update_check.cpp"
+    "./src/settings/update_check.h"
     "./src/mixed/date_time_candidates.h"
     "./src/mixed/mixed_candidates.cpp"
     "./src/mixed/mixed_candidates.h"
@@ -274,8 +285,6 @@ set(SRC_FILES
     "./src/settings/api_credential_test.cpp"
     "./src/settings/api_credential_test.h"
     "./src/settings/api_credential_test_request.h"
-    "./src/settings/collocation_model.cpp"
-    "./src/settings/collocation_model.h"
     "./src/skin/candidate_skin_catalog.cpp"
     "./src/skin/candidate_skin_catalog.h"
     "./src/session/engine_input_session.cpp"
@@ -568,6 +577,11 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/settings/dictionary_manager.h"
     "./src/settings/dictionary_validation.cpp"
     "./src/settings/dictionary_validation.h"
+    # 设置页读自动下载的结果：只用到通道判定与状态文件读写，不引 Server 侧的轮询。
+    "./src/settings/update_channel.cpp"
+    "./src/settings/update_channel.h"
+    "./src/settings/update_download.cpp"
+    "./src/settings/update_download.h"
     "./src/statistics/stats_overview.cpp"
     "./src/statistics/stats_overview.h"
     "./src/statistics/stats_store.cpp"

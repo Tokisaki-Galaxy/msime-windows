@@ -194,6 +194,9 @@ theme_mode = "system"
 settings_window_linger = "off"
 # 打开设置窗口时先显示居中的齿轮启动画面，再淡入主界面
 settings_launch_animation = true
+# 发现新版本时由后台自动下载安装包并校验 SHA256。关闭后只在关于页提示新版本，由用户自行下载。
+# 后台只在开着输入法进程时工作，下载完成会弹窗询问是否安装。
+auto_download_update = false
 # 分表面主题，可选："follow", "dark", "light"（follow = 跟随 theme_mode）
 theme_settings = "follow"
 theme_cand = "follow"
