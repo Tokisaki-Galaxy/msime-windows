@@ -1036,6 +1036,9 @@
         "registeredName": {
           "type": "string"
         },
+        "reregisterPending": {
+          "type": "boolean"
+        },
         "defaultName": {
           "type": "string"
         }
