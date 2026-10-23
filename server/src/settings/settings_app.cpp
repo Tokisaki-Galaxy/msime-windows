@@ -1634,6 +1634,7 @@ void HandleClientMessage(HWND hwnd, const std::string &raw)
                     {"enabled", status.enabled},
                     {"name", wstring_to_string(status.name)},
                     {"registeredName", wstring_to_string(status.registeredName)},
+                    {"reregisterPending", status.reregister_pending},
                     {"defaultName", wstring_to_string(std::wstring(game_compat_name::kDefaultName))},
                     {"protocolVersion", metasequoia::webview::Version}};
                 if (!metasequoia::webview::Validate(response, "server"))

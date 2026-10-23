@@ -12,6 +12,12 @@
 // itself elevated with --apply-game-compat-name; that instance records the name for the TSF DLL's registration
 // (windows/src/Register/Register.cpp reads it so installs and upgrades keep it) and rewrites the profile Description
 // that games read. The game only reads the name when it starts.
+//
+// That Description is the only copy: Display Description would win over it if the profile had one, but we never set
+// one. What the language switch and the Windows settings page show is a separate question, since this profile is not
+// installed into the user's language list (RegisterProfile passes bEnabledByDefault, so it is listed for switching
+// but never reaches Control Panel\International\User Profile). Registering an existing IME under a different name
+// therefore does not rename it in those places, and this file does not try to.
 
 #include <Windows.h>
 
@@ -29,6 +35,10 @@ struct Status
     bool enabled = false;        // a compatibility name is recorded
     std::wstring name;           // the recorded name, empty when off
     std::wstring registeredName; // the profile name Windows currently has, empty when the TIP is not registered
+    // Switching off cannot unregister and register the profile again (that needs the system's registration, not an
+    // elevated copy of the settings program), so the profile keeps the custom name until the next install or
+    // upgrade runs the TSF DLL's registration.
+    bool reregister_pending = false;
 };
 
 Status QueryStatus();

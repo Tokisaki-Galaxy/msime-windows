@@ -137,11 +137,19 @@ std::wstring DescribeGameCompat(const Json &response)
     const std::wstring name = Widen(response.value("name", std::string()));
     const std::wstring registeredName = Widen(response.value("registeredName", std::string()));
     const std::wstring registered = registeredName.empty() ? L"" : L"当前在系统中登记的名称：" + registeredName;
-    if (!response.value("enabled", false))
+    if (response.value("enabled", false))
+    {
+        if (!name.empty() && !registeredName.empty() && name != registeredName)
+            return L"已启用「" + name + L"」，但系统中登记的仍是「" + registeredName + L"」，请点「应用」重新登记";
+        return registered.empty() ? L"已启用" : L"已启用。" + registered;
+    }
+    if (!response.value("reregisterPending", false))
         return registered.empty() ? L"未启用" : L"未启用。" + registered;
-    if (!name.empty() && !registeredName.empty() && name != registeredName)
-        return L"已启用「" + name + L"」，但系统中登记的仍是「" + registeredName + L"」，请点「应用」重新登记";
-    return registered.empty() ? L"已启用" : L"已启用。" + registered;
+    // The recorded name is gone but the profile still carries it: reinstall so the TSF DLL registers the default
+    // name again. Saying just "未启用" here would leave the user looking at a renamed input method with no way out.
+    return registered.empty()
+               ? L"未启用"
+               : L"未启用，但系统中登记的仍是「" + registeredName + L"」，重新安装输入法后会恢复默认名称";
 }
 
 void RefreshProxyState(HelpState &state)
