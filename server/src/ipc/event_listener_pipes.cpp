@@ -135,32 +135,11 @@ bool IsImplicitActivationEvent(UINT event_type)
 // client_id is PID << 32 | TID of the TSF thread. A match against the
 // foreground window's thread, or the thread owning its keyboard focus (a
 // child window on an attached thread), means the user is looking at this TIP.
+// The window/thread matching itself lives in ipc.cpp, because the floating
+// toolbar asks the same question of every connected client at once.
 bool IsForegroundInputThreadClient(uint64_t client_id)
 {
-    const HWND foreground = GetForegroundWindow();
-    if (!foreground)
-    {
-        return false;
-    }
-    DWORD process_id = 0;
-    const DWORD thread_id = GetWindowThreadProcessId(foreground, &process_id);
-    if (thread_id == 0 || static_cast<DWORD>(client_id >> 32) != process_id)
-    {
-        return false;
-    }
-    const DWORD client_thread_id = static_cast<DWORD>(client_id & 0xFFFFFFFFull);
-    if (client_thread_id == thread_id)
-    {
-        return true;
-    }
-    GUITHREADINFO info{sizeof(info)};
-    if (!GetGUIThreadInfo(thread_id, &info) || !info.hwndFocus)
-    {
-        return false;
-    }
-    DWORD focus_process_id = 0;
-    const DWORD focus_thread_id = GetWindowThreadProcessId(info.hwndFocus, &focus_process_id);
-    return focus_process_id == process_id && focus_thread_id == client_thread_id;
+    return PipeClientOwnsForegroundInput(client_id);
 }
 
 void SendFocusSessionReady(const PipeClientActivation &activation)

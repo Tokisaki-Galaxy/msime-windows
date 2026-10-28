@@ -42,6 +42,20 @@ constexpr UINT kFloatingToolbarAutoHideFadeMs = 400;
 // resolves it (#618).
 constexpr UINT_PTR TIMER_ID_CANDIDATE_CARET_FALLBACK = 15;
 constexpr UINT kCandidateCaretFallbackDelayMs = 100;
+// Focus reaches the foreground hook (out-of-context, posted) a step before the
+// incoming TIP activation does (it travels the Main pipe, and the reveal is
+// posted back to this thread). Re-evaluating on the raw edge would blink the
+// toolbar on every switch between two windows that both use this IME, so a
+// foreground change settles for this long before the visibility is re-decided.
+constexpr UINT_PTR TIMER_ID_FTB_FOREGROUND_SETTLE = 16;
+constexpr UINT kFloatingToolbarForegroundSettleMs = 120;
+// Windows does not deliver EVENT_SYSTEM_FOREGROUND to this process for windows of
+// higher integrity (Task Manager, an elevated console): UIPI filters the
+// out-of-context hook. Without a fallback the toolbar keeps the previous window's
+// visibility for as long as such a window is focused. Polling the foreground
+// window costs one API call and closes that hole; the event stays the fast path.
+constexpr UINT_PTR TIMER_ID_FTB_FOREGROUND_POLL = 17;
+constexpr UINT kFloatingToolbarForegroundPollMs = 500;
 // A failed lookup is retried on a later keystroke, at most this many times per
 // composition: the first MSAA/UIA query may only wake the host's accessibility.
 constexpr int kCandidateCaretFallbackMaxAttempts = 3;
