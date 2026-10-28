@@ -2038,6 +2038,11 @@ VisualPtr BuildInputPage(PageContext &context)
              FrequencyRow(SubBlock(L"神经网络模型整句（速度优先）",
                                    L"本地生成，使用轻量模型从最多 12 个备选句中选择；两种模式可同时独立给出结果"),
                           Toggle(context, "association.sentence_neural_keyboard")),
+             FrequencyRow(
+                 SubBlock(
+                     L"上文词库重排（实验）",
+                     L"使用轻量神经模型，根据本次输入的上文调整单字和词组顺序，例如“冬天会下大”后输入 xue 优先选“雪”"),
+                 Toggle(context, "association.context_candidate_rerank")),
              FrequencyRow(SubBlock(L"去重后补充次选",
                                    L"本地处理，某个模型的首选与已有候选重复时，显示该模型排名最高的下一条不同结果"),
                           Toggle(context, "association.sentence_show_next_on_duplicate")),

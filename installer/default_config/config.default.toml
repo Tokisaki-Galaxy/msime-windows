@@ -90,6 +90,8 @@ sentence_google = true
 sentence_neural_desktop = false
 # 神经网络模型整句（速度优先 / keyboard）：同上；与 desktop 同时开启时各自独立给出结果
 sentence_neural_keyboard = true
+# 实验：用轻量神经模型结合最近上屏的前文，重排完整拼音对应的前 32 个词库候选（含单字与词组）
+context_candidate_rerank = false
 # 某个模型的首选与已有候选重复时，改为显示该模型排名最高的下一条不同结果
 sentence_show_next_on_duplicate = false
 # 在候选窗的整句候选后显示来源标签（〔Trigram〕〔Unigram〕〔神经D〕〔神经K〕〔万象〕〔八股〕〔墨奇〕）

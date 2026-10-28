@@ -16,11 +16,12 @@
 // 开关都开时各自独立打分，各出一条首选；两边选中相同文本时合并成一条。
 struct SentenceAssociationOptions
 {
-    bool word_lattice = false;           // kenlm 词格整句，CandidateSource::Generated
-    bool google = false;                 // Google 解码器整句，CandidateSource::Fallback
-    bool neural_desktop = false;         // 用高精度档的神经模型重排词格整句
-    bool neural_keyboard = false;        // 用快速档的神经模型重排词格整句
-    bool show_next_on_duplicate = false; // 某来源首选被去重时，显示该来源下一条不同结果
+    bool word_lattice = false;             // kenlm 词格整句，CandidateSource::Generated
+    bool google = false;                   // Google 解码器整句，CandidateSource::Fallback
+    bool neural_desktop = false;           // 用高精度档的神经模型重排词格整句
+    bool neural_keyboard = false;          // 用快速档的神经模型重排词格整句
+    bool context_candidate_rerank = false; // 实验：用轻量模型按上文重排完整读音的词库候选
+    bool show_next_on_duplicate = false;   // 某来源首选被去重时，显示该来源下一条不同结果
 
     // 高精度档模型不随安装包分发，由宿主按需下载后把 .safetensors 路径（UTF-8）传入；
     // 空 = 模型缺席，neural_desktop 开着也静默不重排，与 collocation_model 的降级范式一致。
@@ -51,7 +52,8 @@ struct SentenceAssociationOptions
     bool operator==(const SentenceAssociationOptions &other) const
     {
         return word_lattice == other.word_lattice && google == other.google && neural_desktop == other.neural_desktop &&
-               neural_keyboard == other.neural_keyboard && show_next_on_duplicate == other.show_next_on_duplicate &&
+               neural_keyboard == other.neural_keyboard && context_candidate_rerank == other.context_candidate_rerank &&
+               show_next_on_duplicate == other.show_next_on_duplicate &&
                neural_desktop_model == other.neural_desktop_model && language_model == other.language_model &&
                collocation_model == other.collocation_model && collocation_weight == other.collocation_weight &&
                collocation_rerank == other.collocation_rerank && collocation_grammar == other.collocation_grammar;

@@ -199,6 +199,7 @@ extern bool g_assoc_sentence_wordlattice;
 extern bool g_assoc_sentence_google;
 extern bool g_assoc_sentence_neural_desktop;
 extern bool g_assoc_sentence_neural_keyboard;
+extern bool g_assoc_context_candidate_rerank;
 extern bool g_assoc_sentence_show_next_on_duplicate;
 extern bool g_assoc_sentence_source_badge;
 extern bool g_assoc_sentence_collocation_enabled;

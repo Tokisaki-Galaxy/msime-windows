@@ -106,6 +106,7 @@ void EngineInputSession::ApplyConfiguration()
     // 高精度档模型按需下载：开关开着才去盘上找（每次击键都会走到这里），没下载时路径为空。
     association.neural_desktop_model = association.neural_desktop ? ResolveNeuralDesktopModelPath() : std::string();
     association.neural_keyboard = GetConfiguredAssocSentenceNeuralKeyboard();
+    association.context_candidate_rerank = GetConfiguredAssocContextCandidateRerank();
     association.show_next_on_duplicate = GetConfiguredAssocSentenceShowNextOnDuplicate();
     // octagram 语法模型总开关：开关关时连模型路径都不解析。引擎侧的加成分由 collocation_model
     // 非空隐含开启，没有独立开关，所以路径空即全部能力关闭；模型缺席时同样置空重排，

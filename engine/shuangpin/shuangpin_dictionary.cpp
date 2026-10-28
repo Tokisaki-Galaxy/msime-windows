@@ -288,6 +288,11 @@ vector<ShuangpinDictionary::WordItem> ShuangpinDictionary::generateSeries( //
                                               lattice_options, neural_rerankers);
         }
 
+        if (sentence_association_.context_candidate_rerank && !rescoring_context_.empty())
+        {
+            quanpin::rerank_dictionary_candidates(candidate_list, quanpin_segmentation, neural_keyboard_model_.get(),
+                                                  rescoring_context_);
+        }
         /* 缓存起来 */
         _cached_buffer_series.insert(effective_cache_key, candidate_list);
     }
@@ -1313,7 +1318,7 @@ std::vector<std::pair<std::string, std::string>> ShuangpinDictionary::query_sing
 
 void ShuangpinDictionary::reset_sentence_cache()
 {
-    // 词格整句在 generateSeries 里合入，辅助码的三个缓存是从它的结果筛出来的，一起清；
+    // 整句和上文词库重排在 generateSeries 里合入，辅助码的三个缓存从它的结果筛出来，一起清；
     // _cached_buffer 只是当前拼音的词库行，不含整句，留着。
     _cached_buffer_sgl.clear();
     _cached_buffer_sgl_reversed.clear();
@@ -1351,8 +1356,10 @@ void ShuangpinDictionary::set_rescoring_context(const std::string &context)
     }
     rescoring_context_ = context;
     // 只有神经重排生效时上文才影响候选，理由见 QuanpinDictionary::set_rescoring_context。
-    const bool rescoring_active = (sentence_association_.neural_keyboard && neural_keyboard_model_.get() != nullptr) ||
-                                  (sentence_association_.neural_desktop && neural_desktop_model_.get() != nullptr);
+    const bool rescoring_active =
+        ((sentence_association_.neural_keyboard || sentence_association_.context_candidate_rerank) &&
+         neural_keyboard_model_.get() != nullptr) ||
+        (sentence_association_.neural_desktop && neural_desktop_model_.get() != nullptr);
     if (rescoring_active)
     {
         reset_sentence_cache();

@@ -545,6 +545,8 @@ bool GetConfiguredAssocSentenceNeuralDesktop();
 bool SetConfiguredAssocSentenceNeuralDesktop(bool enabled);
 bool GetConfiguredAssocSentenceNeuralKeyboard();
 bool SetConfiguredAssocSentenceNeuralKeyboard(bool enabled);
+bool GetConfiguredAssocContextCandidateRerank();
+bool SetConfiguredAssocContextCandidateRerank(bool enabled);
 bool GetConfiguredAssocSentenceShowNextOnDuplicate();
 bool SetConfiguredAssocSentenceShowNextOnDuplicate(bool enabled);
 bool GetConfiguredAssocSentenceSourceBadge();

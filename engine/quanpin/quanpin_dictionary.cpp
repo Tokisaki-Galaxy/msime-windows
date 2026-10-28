@@ -856,6 +856,12 @@ std::vector<WordItem> QuanpinDictionary::query_exact(const std::string &raw_inpu
         append_unique_words(literal_mixed, result);
         result = std::move(literal_mixed);
     }
+    if (sentence_association_.context_candidate_rerank && !rescoring_context_.empty() &&
+        remove_delimiters(pinyin_segmentation_) == remove_delimiters(raw_input))
+    {
+        quanpin::rerank_dictionary_candidates(result, pinyin_segmentation_, neural_keyboard_model_.get(),
+                                              rescoring_context_);
+    }
     series_cache_.insert(resolution.cache_key, result);
     current_candidate_list_ = result;
     return current_candidate_list_;
@@ -2485,7 +2491,7 @@ void QuanpinDictionary::set_fuzzy_pinyin(metasequoia::FuzzyPinyinOptions options
 
 void QuanpinDictionary::reset_sentence_cache()
 {
-    // 词格整句只在 query_series 里合入，结果只经 series_cache_ 缓存；cache_ 是逐前缀的
+    // 整句和上文词库重排的结果只经 series_cache_ 缓存；cache_ 是逐前缀的
     // 词库行加 Google 整句，segmentation_cache_ 是纯切分，都不受重排影响。
     series_cache_.clear();
 }
@@ -2529,8 +2535,10 @@ void QuanpinDictionary::set_rescoring_context(const std::string &context)
     // 上文只经神经重排进入候选；没有生效的神经模型时缓存与上文无关，不清。
     // 每次上屏都会换上文，无条件清会让下一个词的前几键都变成冷查询。之后
     // 打开神经重排会经 set_sentence_association 清缓存，不会沿用旧结果。
-    const bool rescoring_active = (sentence_association_.neural_keyboard && neural_keyboard_model_.get() != nullptr) ||
-                                  (sentence_association_.neural_desktop && neural_desktop_model_.get() != nullptr);
+    const bool rescoring_active =
+        ((sentence_association_.neural_keyboard || sentence_association_.context_candidate_rerank) &&
+         neural_keyboard_model_.get() != nullptr) ||
+        (sentence_association_.neural_desktop && neural_desktop_model_.get() != nullptr);
     if (rescoring_active)
     {
         reset_sentence_cache();
