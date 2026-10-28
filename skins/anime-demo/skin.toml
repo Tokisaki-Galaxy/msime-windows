@@ -2,7 +2,7 @@ schema_version = 2
 
 id = "anime-demo"
 name = "anime-demo"
-version = "0.1.11"
+version = "0.1.12"
 description = "奶油棕浅色 / 可可棕深色候选窗，右上角趴着猫猫虫动图、左下角挂着抱樱花的小白猫、正下方倒挂着长发少女、右下角吊着野猪头少年，布朗熊敲电脑动图与圆底工具按钮。仅供学习使用，形象版权归 LINE FRIENDS。"
 base = "canvas"
 
@@ -42,15 +42,16 @@ width_dip = 50
 height_dip = 71
 z_index = 2
 
-# 倒挂的长发少女挂在候选框正下方居中：139x296 px（头顶贴着图的最上一行），显示 56.35 x 120 DIP。
-# 框下移一个框高、从正中左移 10 DIP，头顶正好贴着面板下边框，整个人都在面板外，不挡候选。
+# 倒挂的长发少女挂在候选框正下方居中：80x80 px 的 2 倍图（帽子在图的最上一行被截平），显示 40 x 40 DIP。
+# 框下移一个框高，帽子截口正好贴着面板下边框，整个人都在面板外，不挡候选；
+# 脸的中线在图中偏右约 1.35 DIP（原图 627 px 宽里约 335 px 处），框左移 1.35 DIP 让脸落在面板正中。
 [[candidate_window.decorations]]
 image = "assets/hanging-girl.png"
 anchor = "bottom"
-offset_x_dip = -10
-offset_y_dip = 120
-width_dip = 56.35
-height_dip = 120
+offset_x_dip = -1.35
+offset_y_dip = 40
+width_dip = 40
+height_dip = 40
 z_index = 2
 
 # 吊在绳子上的野猪头少年挂在候选框右下角：100x187 px（绳头在图的最上一行、中心 x = 57.5 px），显示 38.5 x 72 DIP。
@@ -69,7 +70,7 @@ z_index = 2
 [candidate_window.outer_insets_dip]
 top = 48.4
 right = 10
-bottom = 120
+bottom = 72
 left = 38
 
 [candidate.dark]
