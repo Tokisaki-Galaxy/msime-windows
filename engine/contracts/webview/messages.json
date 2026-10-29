@@ -1449,6 +1449,9 @@
         "limited": {
           "type": "boolean"
         },
+        "hasData": {
+          "type": "boolean"
+        },
         "total": {
           "type": "integer"
         },
@@ -1531,6 +1534,7 @@
         "enabled",
         "statisticsEnabled",
         "limited",
+        "hasData",
         "total",
         "unlocked",
         "achievements"

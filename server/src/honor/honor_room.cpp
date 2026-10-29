@@ -168,9 +168,23 @@ const std::vector<Definition> &Catalog()
 Metrics ComputeMetrics(const std::vector<MsimeStats::DailyRow> &daily, const std::vector<MsimeStats::HourlyRow> &hourly,
                        int today_day_key)
 {
+    std::vector<MsimeStats::DailyRow> sorted = daily;
+    std::sort(sorted.begin(), sorted.end(), [](const MsimeStats::DailyRow &left, const MsimeStats::DailyRow &right) {
+        return left.day_key < right.day_key;
+    });
+    // 只写了选词计数、没有字数也没有活跃时长的行不算打字日。选词路径独立写库，
+    // 统计页也按同一条件过滤，否则「连续 N 天」会和统计页显示的天数对不上。
+    std::vector<MsimeStats::DailyRow> typed;
+    typed.reserve(sorted.size());
+    for (const MsimeStats::DailyRow &row : sorted)
+    {
+        if (row.Total() > 0 || row.active_ms > 0)
+            typed.push_back(row);
+    }
+
     Metrics metrics;
-    metrics.days = static_cast<int64_t>(daily.size());
-    for (const MsimeStats::DailyRow &row : daily)
+    metrics.days = static_cast<int64_t>(typed.size());
+    for (const MsimeStats::DailyRow &row : sorted)
     {
         metrics.total_chars += row.Total();
         metrics.cjk += row.cjk;
@@ -193,8 +207,8 @@ Metrics ComputeMetrics(const std::vector<MsimeStats::DailyRow> &daily, const std
             metrics.fastest_speed = std::max(metrics.fastest_speed, row.Speed());
         }
     }
-    metrics.current_streak = MsimeStats::CurrentStreak(daily, today_day_key);
-    metrics.longest_streak = MsimeStats::LongestStreak(daily);
+    metrics.current_streak = MsimeStats::CurrentStreak(typed, today_day_key);
+    metrics.longest_streak = MsimeStats::LongestStreak(typed);
     for (const MsimeStats::HourlyRow &row : hourly)
     {
         if (row.hour >= 0 && row.hour <= kNightLastHour)

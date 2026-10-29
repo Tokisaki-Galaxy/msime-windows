@@ -1327,6 +1327,7 @@ json::object HandleHonorRequest(const json::object &data)
     response["enabled"] = GetConfiguredHonorRoomEnabled();
     response["statisticsEnabled"] = GetConfiguredStatisticsEnabled();
     response["limited"] = false;
+    response["hasData"] = false;
     response["achievements"] = json::array();
     response["total"] = static_cast<int64_t>(MsimeHonor::Catalog().size());
     response["unlocked"] = int64_t{0};
@@ -1396,6 +1397,10 @@ json::object HandleHonorRequest(const json::object &data)
         response["message"] = "读取统计数据失败：" + error;
         return response;
     }
+    response["hasData"] =
+        std::any_of(daily.begin(), daily.end(),
+                    [](const MsimeStats::DailyRow &row) { return row.Total() > 0 || row.active_ms > 0; }) ||
+        !unlocks.empty();
 
     const int today = LocalTodayDayKey();
     std::vector<MsimeHonor::Progress> progress = MsimeHonor::Evaluate(daily, hourly, today, unlocks);
@@ -1858,6 +1863,13 @@ void HandleClientMessage(HWND hwnd, const std::string &raw)
                 {
                     response["ok"] = false;
                     response["message"] = "荣誉室操作失败，请重试";
+                    response["enabled"] = GetConfiguredHonorRoomEnabled();
+                    response["statisticsEnabled"] = GetConfiguredStatisticsEnabled();
+                    response["limited"] = false;
+                    response["hasData"] = false;
+                    response["total"] = static_cast<int64_t>(MsimeHonor::Catalog().size());
+                    response["unlocked"] = int64_t{0};
+                    response["achievements"] = json::array();
                 }
                 response["requestId"] = data.at("requestId");
                 response["action"] = data.at("action");

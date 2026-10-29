@@ -25,6 +25,7 @@ constexpr float kGridBottom = 18.0f;
 constexpr float kTwoColumnWidth = 620.0f;
 constexpr double kPollMs = 5000.0;
 constexpr double kMinIntervalMs = 1000.0;
+constexpr double kStaleMs = 15000.0;
 
 int64_t JsonInt(const Json &object, const char *key)
 {
@@ -97,7 +98,7 @@ TextStyle TitleStyle()
 
 struct Tile
 {
-    std::wstring tier;
+    std::string tier;
     std::wstring glyph;
     std::wstring title;
     std::wstring note;
@@ -125,16 +126,11 @@ class HonorGrid : public msimeui::Visual
         InvalidateVisual();
     }
 
-    size_t Count() const
-    {
-        return tiles_.size();
-    }
-
     SizeF Measure(const SizeF &availableSize) override
     {
         columns_ = availableSize.width >= kTwoColumnWidth ? 2 : 1;
         const size_t rows = columns_ > 0 ? (tiles_.size() + columns_ - 1) / columns_ : 0;
-        const float height = rows == 0 ? 0.0f : rows * kTileHeight + (rows - 1) * kTileGap + kGridBottom;
+        const float height = rows == 0 ? 0.0f : rows * kTileHeight + (rows - 1) * kTileGap;
         return {availableSize.width, height};
     }
 
@@ -221,6 +217,8 @@ struct HonorState
     bool enabled = false;
     bool statistics_enabled = false;
     bool limited = false;
+    bool has_records = false;
+    bool loaded = false;
     bool has_data = false;
     std::string signature;
     bool pending = false;
@@ -231,6 +229,7 @@ struct HonorState
     std::shared_ptr<Label> status;
     std::shared_ptr<Hideable> disabled_empty;
     std::shared_ptr<Hideable> limited_empty;
+    std::shared_ptr<Hideable> no_data_empty;
     std::shared_ptr<Hideable> content;
     std::shared_ptr<Label> summary;
     std::shared_ptr<HonorGrid> grids[4];
@@ -241,9 +240,10 @@ struct HonorState
     void RenderVisibility()
     {
         disabled_empty->SetVisible(!enabled);
-        const bool ready = enabled && statistics_enabled && !limited;
-        limited_empty->SetVisible(enabled && !ready);
-        content->SetVisible(ready);
+        const bool statistics_ready = enabled && statistics_enabled && !limited;
+        limited_empty->SetVisible(enabled && !statistics_ready);
+        no_data_empty->SetVisible(statistics_ready && loaded && !has_records);
+        content->SetVisible(statistics_ready && (!loaded || has_records));
         footer->SetVisible(enabled);
     }
 
@@ -263,9 +263,13 @@ struct HonorState
 
     void Refresh()
     {
-        if (!enabled || !statistics_enabled || pending || !IsVisible())
+        if (!enabled || !statistics_enabled || !IsVisible())
             return;
-        if (msimeui::NowMs() - last_request_at < kMinIntervalMs)
+        const double now = msimeui::NowMs();
+        // 丢一条响应不能让页面永久停摆：超过 kStaleMs 就当作这次请求失败了。
+        if (pending && now - last_request_at < kStaleMs)
+            return;
+        if (now - last_request_at < kMinIntervalMs)
             return;
         Post();
     }
@@ -280,7 +284,12 @@ struct HonorState
 
     void ApplyAchievements(const Json &message)
     {
-        const std::string next_signature = message.dump();
+        // 只用稳定部分去重：requestId 和提示语每次都变，带上就等于永不去重。
+        const Json empty = Json::array();
+        const Json &achievements =
+            message.contains("achievements") && message["achievements"].is_array() ? message["achievements"] : empty;
+        const std::string next_signature = achievements.dump() + "|" + std::to_string(JsonInt(message, "total")) + "|" +
+                                           std::to_string(JsonInt(message, "unlocked"));
         const bool unchanged = has_data && next_signature == signature;
         signature = next_signature;
         has_data = true;
@@ -289,9 +298,6 @@ struct HonorState
 
         static const char *kTiers[4] = {"sprout", "branch", "ring", "crown"};
         std::map<std::string, std::vector<Tile>> grouped;
-        const Json empty = Json::array();
-        const Json &achievements =
-            message.contains("achievements") && message["achievements"].is_array() ? message["achievements"] : empty;
         for (const Json &entry : achievements)
         {
             Tile tile;
@@ -396,8 +402,6 @@ VisualPtr BuildHonorPage(PageContext &context)
         s->model->Update("honor.enabled", on);
         s->status->SetText(on ? L"荣誉室已开启，正在结算…" : L"荣誉室已关闭，成就记录仍然保留。");
         s->RenderVisibility();
-        if (on)
-            s->Post();
     });
     page.AddSection(MakeRow(
         L"启用荣誉室", L"把本机输入统计结算成一墙成就；默认关闭，只读取本机数据，不新增采集、不联网", state->toggle));
@@ -415,7 +419,6 @@ VisualPtr BuildHonorPage(PageContext &context)
             s->model->Update("honor.enabled", true);
             s->status->SetText(L"正在结算成就…");
             s->RenderVisibility();
-            s->Post();
         });
         auto section = std::make_shared<PaddedSection>(
             EmptyColumn(L"荣誉室还没开门",
@@ -436,7 +439,6 @@ VisualPtr BuildHonorPage(PageContext &context)
             s->model->Update("statistics.enabled", true);
             s->status->SetText(L"已开启输入统计，正常打字后成就开始累积。");
             s->RenderVisibility();
-            s->Post();
         });
         auto visit_stats = std::make_shared<CssButton>(L"打开统计页", HonorButtonStyle(CssButton::Look::Secondary));
         visit_stats->SetOnClick([s]() { s->host->NavigateTo("stats"); });
@@ -453,6 +455,20 @@ VisualPtr BuildHonorPage(PageContext &context)
         section->SetMargin({0.0f, 0.0f, 0.0f, 18.0f});
         state->limited_empty = std::make_shared<Hideable>(section, false);
         page.AddRaw(state->limited_empty, 0.0f);
+    }
+
+    // 荣誉室开着、统计也开着，但还没攒下可结算的记录
+    {
+        auto visit_stats = std::make_shared<CssButton>(L"打开统计页", HonorButtonStyle(CssButton::Look::Secondary));
+        visit_stats->SetOnClick([s]() { s->host->NavigateTo("stats"); });
+        auto section = std::make_shared<PaddedSection>(
+            EmptyColumn(L"还没有可以结算的记录",
+                        L"正常打字几天后再回来。第一次结算会把已经达成的成就一次性补上，并把解锁日期记成当天。",
+                        visit_stats),
+            Thickness{24.0f, 36.0f, 24.0f, 36.0f});
+        section->SetMargin({0.0f, 0.0f, 0.0f, 18.0f});
+        state->no_data_empty = std::make_shared<Hideable>(section, false);
+        page.AddRaw(state->no_data_empty, 0.0f);
     }
 
     // 成就墙
@@ -496,15 +512,18 @@ VisualPtr BuildHonorPage(PageContext &context)
         page.AddRaw(state->footer, 0.0f);
     }
 
-    context.OnConfig([s]() {
-        s->enabled = s->model->GetBool("honor.enabled");
-        s->statistics_enabled = s->model->GetBool("statistics.enabled");
-        s->toggle->SetChecked(s->enabled);
-        s->RenderVisibility();
-        s->Refresh();
+    std::weak_ptr<HonorState> weak = state;
+    context.OnConfig([weak]() {
+        auto self = weak.lock();
+        if (!self)
+            return;
+        self->enabled = self->model->GetBool("honor.enabled");
+        self->statistics_enabled = self->model->GetBool("statistics.enabled");
+        self->toggle->SetChecked(self->enabled);
+        self->RenderVisibility();
+        self->Refresh();
     });
 
-    std::weak_ptr<HonorState> weak = state;
     context.OnMessage("honorResponse", [weak](const Json &message) {
         auto self = weak.lock();
         if (!self)
@@ -515,13 +534,12 @@ VisualPtr BuildHonorPage(PageContext &context)
             self->ShowStatus(Widen(message.value("message", std::string("荣誉室加载失败"))));
             return;
         }
-        self->enabled = message.value("enabled", self->enabled);
-        self->statistics_enabled = message.value("statisticsEnabled", self->statistics_enabled);
         self->limited = message.value("limited", false);
-        self->toggle->SetChecked(self->enabled);
+        self->has_records = message.value("hasData", false);
+        self->loaded = true;
         self->RenderVisibility();
         self->ShowStatus(Widen(message.value("message", std::string())));
-        if (self->enabled && self->statistics_enabled && !self->limited)
+        if (self->has_records)
             self->ApplyAchievements(message);
     });
 

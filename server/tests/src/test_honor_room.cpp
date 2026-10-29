@@ -49,15 +49,6 @@ HourlyRow Hour(int day_key, int hour, int64_t chars)
     return row;
 }
 
-const Definition &Find(const char *id)
-{
-    const auto &catalog = MsimeHonor::Catalog();
-    const auto found = std::find_if(catalog.begin(), catalog.end(),
-                                    [id](const Definition &definition) { return std::string(definition.id) == id; });
-    REQUIRE(found != catalog.end());
-    return *found;
-}
-
 const Progress &FindProgress(const std::vector<Progress> &progress, const char *id)
 {
     const auto found = std::find_if(progress.begin(), progress.end(),
@@ -97,6 +88,8 @@ class ScopedTempDir
 TEST_CASE(honor_catalog_ids_are_unique_and_targets_are_positive)
 {
     std::set<std::string> ids;
+    const std::set<std::string> tiers = {"sprout", "branch", "ring", "crown"};
+    const std::set<std::string> displays = {"count", "percent", "speed", "days"};
     for (const Definition &definition : MsimeHonor::Catalog())
     {
         REQUIRE(ids.insert(definition.id).second);
@@ -104,9 +97,17 @@ TEST_CASE(honor_catalog_ids_are_unique_and_targets_are_positive)
         REQUIRE(definition.title != nullptr);
         REQUIRE(definition.title[0] != L'\0');
         REQUIRE(definition.description != nullptr);
-        // 比率成就必须给样本门槛，否则几十次选词就能拿到，成就会失去分量。
+        // 档位与展示单位的字符串直接进消息契约的 enum，写错会让响应被 Validate 拒掉。
+        REQUIRE(tiers.count(MsimeHonor::TierId(definition.tier)) == 1);
+        REQUIRE(displays.count(MsimeHonor::DisplayId(definition.display)) == 1);
+        // 比率用百分比展示、速度用字/分展示，其余用人数或天数；错配会显示成奇怪的量纲。
         if (definition.metric == Metric::FirstWordPermille)
+        {
             REQUIRE(definition.min_sample > 0);
+            REQUIRE(definition.display == MsimeHonor::Display::Percent);
+        }
+        if (definition.metric == Metric::FastestSpeed)
+            REQUIRE(definition.display == MsimeHonor::Display::Speed);
     }
     REQUIRE(ids.size() >= 20);
 }
@@ -114,28 +115,82 @@ TEST_CASE(honor_catalog_ids_are_unique_and_targets_are_positive)
 TEST_CASE(honor_metrics_aggregate_days_hours_and_first_word_counts)
 {
     const std::vector<DailyRow> daily = {
+        Row(20261026, 0, 0, 0, 0, 5, 5),
         Row(20261027, 1200, 30, 40),
         Row(20261028, 800, 20, 10),
         Row(kToday, 50, 5, 0),
     };
-    const std::vector<HourlyRow> hourly = {Hour(20261027, 1, 300), Hour(20261027, 23, 900), Hour(20261028, 4, 200),
-                                           Hour(20261028, 12, 600)};
+    const std::vector<HourlyRow> hourly = {Hour(20261027, 0, 100), Hour(20261027, 1, 300), Hour(20261027, 23, 900),
+                                           Hour(20261028, 4, 200), Hour(20261028, 5, 700), Hour(20261028, 12, 600)};
     const MsimeHonor::Metrics metrics = MsimeHonor::ComputeMetrics(daily, hourly, kToday);
 
     REQUIRE_EQ(metrics.days, int64_t{3});
+    REQUIRE_EQ(metrics.first_word_total, int64_t{5});
     REQUIRE_EQ(metrics.total_chars, int64_t{2155});
     REQUIRE_EQ(metrics.cjk, int64_t{2050});
     REQUIRE_EQ(metrics.latin, int64_t{50});
     REQUIRE_EQ(metrics.punct, int64_t{55});
     REQUIRE_EQ(metrics.today_chars, int64_t{55});
     REQUIRE_EQ(metrics.best_day_chars, int64_t{1270});
-    REQUIRE_EQ(metrics.night_chars, int64_t{500});
+    REQUIRE_EQ(metrics.night_chars, int64_t{600});
     REQUIRE_EQ(metrics.max_hour_chars, int64_t{900});
     REQUIRE_EQ(metrics.current_streak, 3);
     REQUIRE_EQ(metrics.longest_streak, 3);
 }
 
-TEST_CASE(honor_evaluate_unlocks_by_threshold_and_clamps_progress)
+TEST_CASE(honor_speed_waits_for_enough_active_time)
+{
+    // 活跃时长不足一天的最小门槛时只展示进度，不判解锁；跨过门槛才结算。
+    const std::vector<Progress> short_day = Evaluate({Row(kToday, 50, 0, 0, 59999)}, {}, kToday, {});
+    const Progress &short_speed = FindProgress(short_day, "fast_hand");
+    REQUIRE(!short_speed.unlocked);
+    REQUIRE(!short_speed.sample_ok);
+
+    const std::vector<Progress> full_minute = Evaluate({Row(kToday, 150, 0, 0, 60000)}, {}, kToday, {});
+    const Progress &fast_hand = FindProgress(full_minute, "fast_hand");
+    REQUIRE(fast_hand.unlocked);
+    REQUIRE(fast_hand.sample_ok);
+    REQUIRE_EQ(fast_hand.value, int64_t{150});
+
+    const Progress &speed_200 = FindProgress(full_minute, "speed_200");
+    REQUIRE(!speed_200.unlocked);
+}
+
+TEST_CASE(honor_zero_char_row_breaks_the_streak)
+{
+    // 中间只有选词计数的一天不算打字日，「连续」必须从这里断开。
+    const std::vector<DailyRow> daily = {Row(20261027, 10), Row(20261028, 0, 0, 0, 0, 1, 1), Row(kToday, 10)};
+    const MsimeHonor::Metrics metrics = MsimeHonor::ComputeMetrics(daily, {}, kToday);
+    REQUIRE_EQ(metrics.days, int64_t{2});
+    REQUIRE_EQ(metrics.current_streak, 1);
+    REQUIRE_EQ(metrics.longest_streak, 1);
+}
+
+TEST_CASE(honor_store_reads_every_hour_bucket_in_order)
+{
+    ScopedTempDir temp;
+    const fs::path path = temp.Root() / L"stats.db";
+    std::string error;
+    std::unique_ptr<Store> store = Store::Open(path, error);
+    REQUIRE(store != nullptr);
+
+    MsimeStats::Batch batch;
+    batch.hours.push_back(MsimeStats::HourDelta{20261002, 23, 7, 1000});
+    batch.hours.push_back(MsimeStats::HourDelta{20261001, 4, 3, 1000});
+    batch.hours.push_back(MsimeStats::HourDelta{20261001, 0, 5, 1000});
+    REQUIRE(store->Upsert(batch, error));
+
+    std::vector<HourlyRow> hourly;
+    REQUIRE(store->HourlyRowsAll(hourly, error));
+    REQUIRE_EQ(hourly.size(), size_t{3});
+    REQUIRE_EQ(hourly[0].day_key, 20261001);
+    REQUIRE_EQ(hourly[0].hour, 0);
+    REQUIRE_EQ(hourly[1].hour, 4);
+    REQUIRE_EQ(hourly[2].day_key, 20261002);
+    REQUIRE_EQ(hourly[2].chars, int64_t{7});
+}
+
+TEST_CASE(honor_evaluate_unlocks_by_threshold_and_reports_progress)
 {
     const std::vector<DailyRow> daily = {Row(kToday, 1500)};
     const std::vector<Progress> progress = Evaluate(daily, {}, kToday, {});
@@ -151,7 +206,7 @@ TEST_CASE(honor_evaluate_unlocks_by_threshold_and_clamps_progress)
 
 TEST_CASE(honor_ratio_achievements_wait_for_a_usable_sample)
 {
-    const std::vector<Progress> small = Evaluate({Row(kToday, 0, 0, 0, 0, 900, 100)}, {}, kToday, {});
+    const std::vector<Progress> small = Evaluate({Row(kToday, 0, 0, 0, 0, 90, 100)}, {}, kToday, {});
     const Progress &small_ratio = FindProgress(small, "first_word_80");
     REQUIRE(!small_ratio.unlocked);
     REQUIRE(!small_ratio.sample_ok);
@@ -200,4 +255,59 @@ TEST_CASE(honor_unlock_facts_are_idempotent_and_survive_clearing_counts)
     unlocks.clear();
     REQUIRE(store->HonorUnlocks(unlocks, error));
     REQUIRE_EQ(unlocks.size(), size_t{2});
+}
+
+TEST_CASE(honor_unlocks_survive_retention_cleanup)
+{
+    ScopedTempDir temp;
+    const fs::path path = temp.Root() / L"stats.db";
+    std::string error;
+    std::unique_ptr<Store> store = Store::Open(path, error);
+    REQUIRE(store != nullptr);
+
+    // 一天旧统计和一条当月解锁；按保留策略删掉旧计数，解锁记录必须原样保留。
+    MsimeStats::Batch batch;
+    MsimeStats::DayDelta old_day;
+    old_day.day_key = 20260101;
+    old_day.cjk = 500;
+    batch.days.push_back(old_day);
+    REQUIRE(store->Upsert(batch, error));
+    REQUIRE(store->AddHonorUnlocks({{"million", 20260101}}, error));
+
+    int64_t removed = 0;
+    REQUIRE(store->ClearThrough(20261001, removed, error));
+    REQUIRE_EQ(removed, int64_t{1});
+
+    std::vector<HonorUnlock> unlocks;
+    REQUIRE(store->HonorUnlocks(unlocks, error));
+    REQUIRE_EQ(unlocks.size(), size_t{1});
+    REQUIRE_EQ(unlocks[0].id, std::string("million"));
+    REQUIRE_EQ(unlocks[0].day_key, 20260101);
+}
+
+TEST_CASE(honor_unlocks_survive_daily_retention)
+{
+    ScopedTempDir temp;
+    const fs::path path = temp.Root() / L"stats.db";
+    std::string error;
+    std::unique_ptr<Store> store = Store::Open(path, error);
+    REQUIRE(store != nullptr);
+
+    MsimeStats::Batch batch;
+    MsimeStats::DayDelta old_day;
+    old_day.day_key = 20260101;
+    old_day.cjk = 500;
+    batch.days.push_back(old_day);
+    REQUIRE(store->Upsert(batch, error));
+    REQUIRE(store->AddHonorUnlocks({{"million", 20260101}}, error));
+
+    // 走真正的每日保留策略入口，而不是直接调 ClearThrough：标记读写和 cutoff 计算
+    // 同样不能碰解锁记录。
+    MsimeStats::RetentionOutcome outcome;
+    REQUIRE(MsimeStats::RunDailyRetention(*store, MsimeStats::Retention::Days30, kToday, outcome, error));
+    REQUIRE_EQ(outcome.removed_days, int64_t{1});
+
+    std::vector<HonorUnlock> unlocks;
+    REQUIRE(store->HonorUnlocks(unlocks, error));
+    REQUIRE_EQ(unlocks.size(), size_t{1});
 }
