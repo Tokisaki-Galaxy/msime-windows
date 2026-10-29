@@ -623,6 +623,8 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/statistics/stats_overview.h"
     "./src/statistics/stats_store.cpp"
     "./src/statistics/stats_store.h"
+    "./src/honor/honor_room.cpp"
+    "./src/honor/honor_room.h"
     "./src/config/credential_protection.cpp"
     "./src/config/credential_protection.h"
     "./src/config/ime_config.cpp"
