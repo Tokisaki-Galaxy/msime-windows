@@ -206,8 +206,8 @@ TEST_CASE(honor_evaluate_unlocks_by_threshold_and_reports_progress)
 
 TEST_CASE(honor_ratio_achievements_wait_for_a_usable_sample)
 {
-    const std::vector<Progress> small = Evaluate({Row(kToday, 0, 0, 0, 0, 90, 100)}, {}, kToday, {});
-    const Progress &small_ratio = FindProgress(small, "first_word_80");
+    const std::vector<Progress> sparse_sample = Evaluate({Row(kToday, 0, 0, 0, 0, 90, 100)}, {}, kToday, {});
+    const Progress &small_ratio = FindProgress(sparse_sample, "first_word_80");
     REQUIRE(!small_ratio.unlocked);
     REQUIRE(!small_ratio.sample_ok);
     REQUIRE_EQ(small_ratio.value, int64_t{900});
