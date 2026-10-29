@@ -206,7 +206,6 @@ class HonorGrid : public msimeui::Visual
     }
 
     std::vector<Tile> tiles_;
-    RectF bounds_ = {};
 };
 
 struct HonorState
