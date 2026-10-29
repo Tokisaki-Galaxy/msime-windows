@@ -591,6 +591,7 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/settings/native/native_page_ai.cpp"
     "./src/settings/native/native_page_floating_toolbar.cpp"
     "./src/settings/native/native_page_stats.cpp"
+    "./src/settings/native/native_page_honor.cpp"
     "./src/settings/native/native_page_help.cpp"
     "./src/settings/native/native_page_help_widgets.cpp"
     "./src/settings/native/native_page_help_widgets.h"
