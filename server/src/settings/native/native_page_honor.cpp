@@ -128,32 +128,33 @@ class HonorGrid : public msimeui::Visual
 
     SizeF Measure(const SizeF &availableSize) override
     {
-        columns_ = availableSize.width >= kTwoColumnWidth ? 2 : 1;
-        const size_t rows = columns_ > 0 ? (tiles_.size() + columns_ - 1) / columns_ : 0;
-        const float height = rows == 0 ? 0.0f : rows * kTileHeight + (rows - 1) * kTileGap;
+        const int columns = availableSize.width >= kTwoColumnWidth ? 2 : 1;
+        const size_t rows =
+            tiles_.empty() ? 0 : (tiles_.size() + static_cast<size_t>(columns) - 1) / static_cast<size_t>(columns);
+        const float height =
+            rows == 0 ? 0.0f : static_cast<float>(rows) * kTileHeight + static_cast<float>(rows - 1) * kTileGap;
         return {availableSize.width, height};
     }
 
     void Arrange(const RectF &finalRect) override
     {
-        boxes_.clear();
-        columns_ = finalRect.width >= kTwoColumnWidth ? 2 : 1;
-        const float columnWidth =
-            (finalRect.width - (columns_ - 1) * kTileGap) / static_cast<float>(std::max(columns_, 1));
-        for (size_t i = 0; i < tiles_.size(); ++i)
-        {
-            const size_t row = i / static_cast<size_t>(std::max(columns_, 1));
-            const size_t column = i % static_cast<size_t>(std::max(columns_, 1));
-            const RectF box{finalRect.x + column * (columnWidth + kTileGap),
-                            finalRect.y + row * (kTileHeight + kTileGap), columnWidth, kTileHeight};
-            boxes_.push_back(box);
-        }
+        bounds_ = finalRect;
     }
 
     void Render(msimeui::DeviceResources &dr) override
     {
-        for (size_t i = 0; i < tiles_.size() && i < boxes_.size(); ++i)
-            RenderTile(dr, tiles_[i], boxes_[i]);
+        // 和其他统计卡片一样从 bounds_ 现算格子，不缓存 Arrange 的结果：页面被索引提前构建、
+        // 稍后才挂到窗口时，缓存的格子会在第一次绘制时还是空的。
+        const int columns = bounds_.width >= kTwoColumnWidth ? 2 : 1;
+        const float columnWidth = (bounds_.width - (columns - 1) * kTileGap) / static_cast<float>(std::max(columns, 1));
+        for (size_t i = 0; i < tiles_.size(); ++i)
+        {
+            const size_t row = i / static_cast<size_t>(std::max(columns, 1));
+            const size_t column = i % static_cast<size_t>(std::max(columns, 1));
+            const RectF box{bounds_.x + column * (columnWidth + kTileGap), bounds_.y + row * (kTileHeight + kTileGap),
+                            columnWidth, kTileHeight};
+            RenderTile(dr, tiles_[i], box);
+        }
     }
 
   private:
@@ -205,8 +206,7 @@ class HonorGrid : public msimeui::Visual
     }
 
     std::vector<Tile> tiles_;
-    std::vector<RectF> boxes_;
-    int columns_ = 2;
+    RectF bounds_ = {};
 };
 
 struct HonorState
