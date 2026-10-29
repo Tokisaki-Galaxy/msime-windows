@@ -1148,8 +1148,8 @@ void TsfDiagnosticPipeEventListenerLoopThread()
                     memcpy(payload.data(), frame.data() + sizeof(header), header.payload_bytes);
                     if (header.dropped_count != 0)
                     {
-                        DiagnosticLog::Write(fmt::format(L"[tsf-log] source_pid={} dropped_records={}",
-                                                         header.source_process_id, header.dropped_count));
+                        DiagnosticLog::WriteTsf(fmt::format(L"[tsf-log] source_pid={} dropped_records={}",
+                                                            header.source_process_id, header.dropped_count));
                     }
                     size_t start = 0;
                     while (start < payload.size())
@@ -1158,7 +1158,7 @@ void TsfDiagnosticPipeEventListenerLoopThread()
                         const size_t length = end == std::wstring::npos ? payload.size() - start : end - start;
                         if (length != 0)
                         {
-                            DiagnosticLog::Write(payload.substr(start, length));
+                            DiagnosticLog::WriteTsf(payload.substr(start, length));
                         }
                         if (end == std::wstring::npos)
                         {

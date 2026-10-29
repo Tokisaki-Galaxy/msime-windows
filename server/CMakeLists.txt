@@ -270,6 +270,8 @@ set(SRC_FILES
     "./src/log/fanylog.h"
     "./src/log/candidate_diag_log.cpp"
     "./src/log/candidate_diag_log.h"
+    "./src/log/diagnostic_log_naming.cpp"
+    "./src/log/diagnostic_log_naming.h"
     "./src/log/ftb_diag_log.h"
     "./src/resource/resource.h"
     "./src/resource/resource.rc"
