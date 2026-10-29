@@ -19,10 +19,10 @@ namespace native_settings
 {
 namespace
 {
-constexpr float kTileHeight = 108.0f;
+constexpr float kTileHeight = 100.0f;
 constexpr float kTileGap = 12.0f;
 constexpr float kGridBottom = 18.0f;
-constexpr float kTwoColumnWidth = 620.0f;
+constexpr float kTwoColumnWidth = 480.0f;
 constexpr double kPollMs = 5000.0;
 constexpr double kMinIntervalMs = 1000.0;
 constexpr double kStaleMs = 15000.0;
@@ -168,41 +168,37 @@ class HonorGrid : public msimeui::Visual
         StrokeRounded(dr, box, 10.0f, border, 1.0f);
 
         // 左侧档位徽章：新 / 枝 / 轮 / 参，解锁后填成强调色。
-        const PointF center{box.x + 36.0f, box.y + 40.0f};
-        const RectF badge{center.x - 18.0f, center.y - 18.0f, 36.0f, 36.0f};
-        FillRounded(dr, badge, 18.0f, tile.unlocked ? p.accent : p.surfaceSunken);
+        const PointF center{box.x + 32.0f, box.y + 34.0f};
+        const RectF badge{center.x - 16.0f, center.y - 16.0f, 32.0f, 32.0f};
+        FillRounded(dr, badge, 16.0f, tile.unlocked ? p.accent : p.surfaceSunken);
         if (tile.unlocked)
-            StrokeRounded(dr, badge, 18.0f, WithAlpha(p.accentStrong, 0.6f), 1.0f);
-        TextStyle glyphStyle = DocStyle(14.0f, DWRITE_FONT_WEIGHT_MEDIUM);
+            StrokeRounded(dr, badge, 16.0f, WithAlpha(p.accentStrong, 0.6f), 1.0f);
+        TextStyle glyphStyle = DocStyle(13.0f, DWRITE_FONT_WEIGHT_MEDIUM);
         glyphStyle.align = DWRITE_TEXT_ALIGNMENT_CENTER;
         DrawTextInRect(dr, tile.glyph, glyphStyle, badge, tile.unlocked ? p.chromeBg : p.textMuted, true);
 
-        const float textLeft = box.x + 64.0f;
-        const float textWidth = std::max(box.width - 64.0f - 16.0f, 1.0f);
-        DrawTextInRect(dr, tile.title, TitleStyle(), {textLeft, box.y + 16.0f, textWidth, 22.0f},
+        const float textLeft = box.x + 58.0f;
+        const float textWidth = std::max(box.width - 58.0f - 14.0f, 1.0f);
+        DrawTextInRect(dr, tile.title, TitleStyle(), {textLeft, box.y + 8.0f, textWidth, 20.0f},
                        tile.unlocked ? p.text : p.textSecondary);
 
-        tile.description.Draw(dr, {textLeft, box.y + 40.0f}, tile.unlocked ? p.textMuted : p.textSubtle, textWidth);
+        tile.description.Draw(dr, {textLeft, box.y + 30.0f}, tile.unlocked ? p.textMuted : p.textSubtle, textWidth);
 
-        const float bottom = box.y + kTileHeight - 22.0f;
+        // 状态行右对齐：解锁显示日期，未解锁显示当前进度。数字和进度条各占一行，窄栏下也不会互相挤掉。
+        const RectF noteRect{textLeft, box.y + 66.0f, textWidth, 18.0f};
         if (tile.unlocked)
         {
-            TextStyle noteStyle = DocStyle(kFontCaption);
-            DrawTextInRect(dr, tile.note, noteStyle, {textLeft, bottom, textWidth, 18.0f}, p.accent);
+            DrawTextInRect(dr, tile.note, DocStyle(kFontCaption), noteRect, p.accent, true);
             return;
         }
-
-        // 进度条：右下角的数字给出真实进度，条形按 target 截断。
-        const float noteWidth = std::min(std::max(textWidth * 0.5f, 90.0f), 170.0f);
-        const float barWidth = std::max(textWidth - noteWidth - 10.0f, 20.0f);
-        const RectF track{textLeft, bottom + 5.0f, barWidth, 6.0f};
-        FillRounded(dr, track, 3.0f, p.surfaceSunken);
+        DrawTextInRect(dr, tile.note, DocStyle(kFontCaption), noteRect, tile.sample_ok ? p.textMuted : p.dangerText,
+                       true);
+        const RectF track{textLeft, box.y + 88.0f, textWidth, 5.0f};
+        FillRounded(dr, track, 2.5f, p.surfaceSunken);
         const float fraction =
             tile.target > 0 ? std::min(static_cast<float>(tile.value) / static_cast<float>(tile.target), 1.0f) : 0.0f;
         if (fraction > 0.0f)
-            FillRounded(dr, {track.x, track.y, std::max(track.width * fraction, 6.0f), track.height}, 3.0f, p.accent);
-        DrawTextInRect(dr, tile.note, DocStyle(kFontCaption), {textLeft + barWidth + 10.0f, bottom, noteWidth, 18.0f},
-                       tile.sample_ok ? p.textMuted : p.dangerText, true);
+            FillRounded(dr, {track.x, track.y, std::max(track.width * fraction, 5.0f), track.height}, 2.5f, p.accent);
     }
 
     std::vector<Tile> tiles_;
@@ -226,6 +222,7 @@ struct HonorState
 
     std::shared_ptr<ToggleSwitch> toggle;
     std::shared_ptr<Label> status;
+    std::shared_ptr<Hideable> status_holder;
     std::shared_ptr<Hideable> disabled_empty;
     std::shared_ptr<Hideable> limited_empty;
     std::shared_ptr<Hideable> no_data_empty;
@@ -233,6 +230,7 @@ struct HonorState
     std::shared_ptr<Label> summary;
     std::shared_ptr<HonorGrid> grids[4];
     std::shared_ptr<Hideable> tier_holders[4];
+    std::shared_ptr<Label> tier_counts[4];
     std::shared_ptr<Hideable> footer;
     std::unique_ptr<UiTimer> timer;
 
@@ -321,12 +319,22 @@ struct HonorState
 
         const int64_t total = JsonInt(message, "total");
         const int64_t unlocked = JsonInt(message, "unlocked");
-        summary->SetText(L"已解锁 " + std::to_wstring(unlocked) + L" / " + std::to_wstring(total) + L" 项");
+        const int64_t percent = total > 0 ? (unlocked * 100 + total / 2) / total : 0;
+        summary->SetText(L"已解锁 " + std::to_wstring(unlocked) + L" / " + std::to_wstring(total) + L" 项 · " +
+                         std::to_wstring(percent) + L"%");
         for (int i = 0; i < 4; ++i)
         {
-            std::vector<Tile> tiles = std::move(grouped[kTiers[i]]);
-            const bool has_tiles = !tiles.empty();
-            grids[i]->SetTiles(std::move(tiles));
+            const auto &group = grouped[kTiers[i]];
+            const int64_t tier_total = static_cast<int64_t>(group.size());
+            int64_t tier_unlocked = 0;
+            for (const Tile &tile : group)
+            {
+                if (tile.unlocked)
+                    ++tier_unlocked;
+            }
+            tier_counts[i]->SetText(std::to_wstring(tier_unlocked) + L" / " + std::to_wstring(tier_total));
+            const bool has_tiles = !group.empty();
+            grids[i]->SetTiles(std::move(grouped[kTiers[i]]));
             tier_holders[i]->SetVisible(has_tiles);
         }
     }
@@ -334,6 +342,7 @@ struct HonorState
     void ShowStatus(const std::wstring &message)
     {
         status->SetText(message);
+        status_holder->SetVisible(!message.empty());
     }
 };
 
@@ -407,7 +416,8 @@ VisualPtr BuildHonorPage(PageContext &context)
 
     state->status = std::make_shared<Label>(L"", DocStyle(kFontCaption), TextRole::Muted);
     state->status->SetMargin({0.0f, 0.0f, 0.0f, 12.0f});
-    page.AddRaw(state->status, 0.0f);
+    state->status_holder = std::make_shared<Hideable>(state->status, false);
+    page.AddRaw(state->status_holder, 0.0f);
 
     // 未开启：只显示引导，不读数据库
     {
@@ -482,11 +492,15 @@ VisualPtr BuildHonorPage(PageContext &context)
         for (int i = 0; i < 4; ++i)
         {
             auto tier_column = std::make_shared<Column>(0.0f);
+            auto header = std::make_shared<Row>(8.0f);
             auto title = std::make_shared<Label>(std::wstring(kTierTitles[i]) + L" · " + kTierNotes[i],
                                                  SectionTitleStyle(), TextRole::Primary);
-            title->SetMargin({0.0f, 0.0f, 0.0f, 12.0f});
             IndexSettingTitle(title, kTierTitles[i]);
-            tier_column->Add(title);
+            header->Add(title, 1.0f);
+            state->tier_counts[i] = std::make_shared<Label>(L"", DocStyle(kFontCaption), TextRole::Muted);
+            header->Add(state->tier_counts[i]);
+            header->SetMargin({0.0f, 0.0f, 0.0f, 12.0f});
+            tier_column->Add(header);
             state->grids[i] = std::make_shared<HonorGrid>();
             tier_column->Add(state->grids[i]);
             auto section = std::make_shared<Section>(tier_column);
@@ -537,7 +551,8 @@ VisualPtr BuildHonorPage(PageContext &context)
         self->has_records = message.value("hasData", false);
         self->loaded = true;
         self->RenderVisibility();
-        self->ShowStatus(Widen(message.value("message", std::string())));
+        // 成功时页面本身已经说明状态，不再占一行显示“已加载荣誉室”。
+        self->ShowStatus(L"");
         if (self->has_records)
             self->ApplyAchievements(message);
     });
