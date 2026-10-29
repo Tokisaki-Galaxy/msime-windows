@@ -23,6 +23,7 @@
 #include "window/caret_state_indicator_policy.h"
 #include "utils/ime_utils.h"
 #include "config/ime_config.h"
+#include "conversion/chinese_converter.h"
 #include "session/session_factory.h"
 #include "mixed/date_time_candidates.h"
 #include "log/candidate_diag_log.h"
@@ -632,7 +633,8 @@ struct ScopedServerKeyLatency
 };
 
 // 把候选框换回 Ctrl+Enter 或选中「📅日期」之前的那一屏。子页期间输入串一个字都没动，session
-// 里的候选还是原来那批，所以这里直接把存下来的 items / 页码 / 高亮位放回去即可；随后这颗按键
+// 里的候选还是原来那批，所以这里直接把存下来的 items / 页码 / 高亮位放回去。子页期间切过字形时，
+// 放回的列表还是按旧字形展开的写法，要按当前字形换写法，显示与上屏才跟得上切换。随后这颗按键
 // 继续走它本来的流程，就像子页从来没出现过一样。
 void ExitCandidateSubPage()
 {
@@ -653,6 +655,8 @@ void ExitCandidateSubPage()
     g_translation_saved_selected_index = 0;
     g_translation_saved_selection_started = false;
     RefreshCandidatePageUi(false);
+    if (CandidateListCharacterSet() != GetConfiguredCharacterSet())
+        RespellCandidatesForCharacterSetChange();
 }
 
 // 混输里的「📅日期」入口：把候选框换成这组的全部格式（顺序与 Shift+T 模式同一份），空格/数字键
@@ -859,7 +863,7 @@ void HandleCreatingWordEscape(uint64_t client_id, uint64_t activation_epoch, uin
         composition.restored_selection_highlight = {};
         Global::MsgTypeToTsf = Global::DataFromServerMsgType::CompositionRestored;
         Global::candidate_ui.selected_text =
-            BuildCreateWordPipePayload(std::string{}, composition.creating_word.word) + L"\t0";
+            BuildCreateWordPipePayload(std::string{}, composition.creating_word.prefix_text) + L"\t0";
         SendCurrentDataToClient(client_id, activation_epoch, request_id);
         if (GetConfiguredCandidateWindowPreeditStyle() == "empty")
         {
@@ -915,8 +919,8 @@ void HandleTrilingualCycleKey(uint64_t client_id, uint64_t activation_epoch, uin
     // prefix, then commit the remaining raw spelling without choosing or
     // learning a candidate.
     const std::string raw = g_inputSession ? g_inputSession->get_pinyin_sequence_with_cases() : std::string{};
-    const std::wstring commit_text = string_to_wstring(
-        CandidateTextForOutput(GlobalIme::composition.creating_word.word) + (g_r_mode_triggered ? "R" + raw : raw));
+    const std::wstring commit_text =
+        string_to_wstring(GlobalIme::composition.creating_word.prefix_text + (g_r_mode_triggered ? "R" + raw : raw));
 
     bool native_mode_changed = false;
     if (destination != Mode::English)
@@ -1048,13 +1052,17 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             // The packet's point[] is this key's badge anchor, not the
             // candidate anchor: read it locally and leave Global::Point alone.
             // Legacy clients leave the struct-default point there instead.
-            if (SetConfiguredCharacterSet(next) && GetConfiguredCharacterSet() != previous &&
-                ClientNegotiatedCaretStateIndicator(client_id))
+            const bool changed = SetConfiguredCharacterSet(next) && GetConfiguredCharacterSet() != previous;
+            if (changed && GetConfiguredCharacterSet() == "traditional")
+                ChineseConverter::PreloadInBackground();
+            if (changed && ClientNegotiatedCaretStateIndicator(client_id))
             {
                 PostCaretStateBadge(FanyImeUi::SingleStateBadge(FanyImeUi::CaretStateKind::CharacterSet,
                                                                 GetConfiguredCharacterSet() == "traditional"),
                                     namedpipeData.point[0], namedpipeData.point[1]);
             }
+            if (changed)
+                RespellCandidatesForCharacterSetChange();
         }
         return;
     }
@@ -1156,7 +1164,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
         const std::string raw = g_r_mode_triggered ? "R" + input_before_key : input_before_key;
         const std::string text = FanyImeIpc::EnteredPinyinText(
             raw, convert_shuangpin ? g_inputSession->get_quanpin() : std::string{}, convert_shuangpin);
-        Global::candidate_ui.selected_text = string_to_wstring(GlobalIme::composition.creating_word.word + text);
+        Global::candidate_ui.selected_text = string_to_wstring(GlobalIme::composition.creating_word.prefix_text + text);
         Global::MsgTypeToTsf = Global::DataFromServerMsgType::CommitExactText;
         SendCurrentDataToClient(client_id, activation_epoch, request_id);
         return;
@@ -1295,8 +1303,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
                 {
                     const auto edge = word_character_direction < 0 ? FanyImeIpc::HanCharacterEdge::First
                                                                    : FanyImeIpc::HanCharacterEdge::Last;
-                    const auto character =
-                        FanyImeIpc::ExtractHanCharacter(ListedCandidateTextForOutput(highlighted_item.word), edge);
+                    const auto character = FanyImeIpc::ExtractHanCharacter(CandidateOutputText(highlighted_item), edge);
                     if (character)
                     {
                         Global::MsgTypeToTsf = Global::DataFromServerMsgType::CommitExactText;
@@ -1663,9 +1670,10 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             // ApplyCompositionEditKey ran -- which is what the hold applies in
             // every outcome. The candidate page follows it below.
             Global::MsgTypeToTsf = Global::DataFromServerMsgType::CompositionRestored;
-            Global::candidate_ui.selected_text = BuildCreateWordPipePayload(GlobalIme::composition.raw_input_with_cases,
-                                                                            GlobalIme::composition.creating_word.word) +
-                                                 L'\t' + std::to_wstring(GlobalIme::composition.caret_position);
+            Global::candidate_ui.selected_text =
+                BuildCreateWordPipePayload(GlobalIme::composition.raw_input_with_cases,
+                                           GlobalIme::composition.creating_word.prefix_text) +
+                L'\t' + std::to_wstring(GlobalIme::composition.caret_position);
             SendCurrentDataToClient(client_id, activation_epoch, request_id);
             ScopedKeyStage publish_restored{client_id, activation_epoch, request_id, L"handle-candidates"};
             PublishRestoredCompositionCandidates(client_id, activation_epoch);

@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -17,7 +18,9 @@
 #include "ipc.h"
 #include "ipc/async_request_origin.h"
 #include "ipc/candidate_selection_policy.h"
+#include "ipc/candidate_text_policy.h"
 #include "ipc/candidate_ui_owner.h"
+#include "ipc/traditional_variant_expansion_policy.h"
 #include "ipc/event_listener.h"
 #include "engine/contracts/v_mode_input.h"
 #include "window/caret_state_indicator_policy.h"
@@ -132,22 +135,50 @@ AsyncRequestOrigin FindCloudRequestOrigin(const std::string &input, uint64_t gen
 AsyncRequestOrigin FindEnglishRequestOrigin(const std::string &input, uint64_t generation);
 AsyncRequestOrigin FindMixedRequestOrigin(const std::string &input, uint64_t generation);
 AsyncRequestOrigin FindAiRequestOrigin(const std::string &input, uint64_t generation);
-// 不属于当前候选列表的文字的输出形式：繁体字符集下做简转繁，日语方案原样输出。这类文字有造词前缀、
-// 只有一条译义时直接上屏的那条译义、AI 上下文、按键原串。当前候选列表里的某条候选（含译文页上
-// 列出的译义）不要用它，用 ListedCandidateTextForOutput。
+// 不属于当前候选列表的文字的输出形式：繁体字符集下做简转繁，日语方案原样输出。这类文字有只有一条译义时
+// 直接上屏的那条译义、AI 上下文、按键原串。当前候选列表里的某条候选（含译文页上列出的译义）不要用它，
+// 用 CandidateOutputText；造词前缀用 creating_word.prefix_text。
 std::string CandidateTextForOutput(const std::string &text);
 // 当前候选列表是 U 模式（部件拆字）的结果：唤醒标记仍在、输入串以大写 U 开头，且不在译文页上。
 // 组合一旦被 reset_state 或 ClearSpecialModeTriggers 清掉就回 false，要在清之前判。
 bool IsRadicalCandidateListActive();
-// 当前候选列表里单条候选（ui.items 的 word）的输出形式：U 模式拆字结果原样输出，其余同
-// CandidateTextForOutput。只接受单条候选，不接受拼接了造词前缀的串；前缀接候选上屏用
-// FanyImeIpc::CommitTextAfterCreatingWordPrefix。同一条候选的显示文字与上屏文字都要取自这里，两者才一致。
-std::string ListedCandidateTextForOutput(const std::string &text);
+// 当前显示的候选用的字形（"traditional" 或 "simplified"）：主列表是组页时记下的（CandidateListCharacterSet），
+// 译文页、日期页是当前配置。显示、上屏以及与显示文字比较的第一写法都按它取。只在任务线程上调用。
+// 选词时要在推进组合、为下一段重新组页之前取，之后读到的是下一张列表的字形。
+const std::string &ShownCandidateCharacterSet();
+// 当前候选列表里一条候选的显示与上屏文字，字形取 ShownCandidateCharacterSet。
+// 不做简转繁时（简体、日语方案、U 模式拆字结果）是 word；繁体时是展开填的写法，没展开的候选转成繁体。
+// 同一条候选的显示文字与上屏文字都要取自这里，两者才一致。要在 reset_state 之前取，理由同
+// IsRadicalCandidateListActive。只在任务线程上调用。
+std::string CandidateOutputText(const WordItem &item);
+// 按当前候选列表组页时的字形把候选展开成每种写法一项（规则见 FanyImeIpc::ExpandTraditionalVariants）；
+// 不做简转繁时原样返回。
+std::vector<WordItem> WithTraditionalVariants(std::vector<WordItem> items);
+// 同 WithTraditionalVariants，字形取 character_set（"traditional" 或 "simplified"），不读配置。
+std::vector<WordItem> WithTraditionalVariantsFor(std::vector<WordItem> items, const std::string &character_set);
+// 在每组写法只占一项的列表上做 reorder（apply_fixed_positions、place_quick_phrases 这类按 word 删插的
+// 重排），再按组页时的字形重新展开（规则见 FanyImeIpc::ReorderAsOneItemPerWord）。items 可以是已展开的
+// ui.items；不做简转繁时等于直接 reorder(items)。
+void ReorderCandidatesAsOneItemPerWord(std::vector<WordItem> &items,
+                                       const std::function<void(std::vector<WordItem> &)> &reorder);
+// 当前候选列表组页时的字形、方案、U 模式拆字列表状态与繁体写法地区，交给 FanyImeIpc 里填写法与判定
+// 异步插入的纯函数。
+FanyImeIpc::CandidateSpellingSettings CandidateListSpellingSettings();
+// 当前候选列表是按繁体组的页时，给一条要插进列表的云或 AI 候选填上排序后的第一写法；否则原样返回
+// （规则见 FanyImeIpc::WithFirstTraditionalSpellingOf）。
+WordItem WithFirstTraditionalSpelling(WordItem item);
+// 一段简体文字整串的第一写法：ShownCandidateCharacterSet 是繁体（非日语方案）时取排序后的第一种写法，
+// 否则原样返回。不看 U 模式：造词前缀不来自拆字结果。
+std::string FirstSpellingOfText(const std::string &text);
+// 当前造词已选部分（GlobalIme::composition.creating_word）的简体底词、显示文字与第一写法标记。
+// ShownCandidateCharacterSet 与第一段选中时不同，第一写法标记为 false，上屏按显示的文字拼接。
+FanyImeIpc::ChosenText CreatingWordChosenText();
 // 每个按键包到达时调用：记下它是否来自密码 / PIN 输入框，并在宿主或焦点会话变化时清空 AI 上下文。
 void NoteAiContextKeySource(uint64_t client_id, uint64_t activation_epoch, bool sensitive_field);
 void AppendAiContext(const std::string &committed_word);
+// current_output_text 是造词前缀的输出文字（creating_word.prefix_text），原样放进管道。
 std::wstring BuildCreateWordPipePayload(const std::string &remaining_raw_input_with_cases,
-                                        const std::string &current_word);
+                                        const std::string &current_output_text);
 // segmented_pinyin 定下来之后调用：双拼组合时把原串切分和全拼切分记进 GlobalIme::composition，
 // 供「双拼显示全拼」使用，其余组合清空。
 void SyncShuangpinPreeditForms();
@@ -252,6 +283,9 @@ enum class PageMoveResult
 };
 
 // event_listener_candidates.cpp
+// 当前候选列表按哪种字形显示（"traditional" 或 "simplified"），PrepareCandidateList 每次组页、
+// RespellCandidatesForCharacterSetChange 切换字形时记下；还没组过页时是空串。只在任务线程上调用。
+const std::string &CandidateListCharacterSet();
 std::string CurrentRankingContextKey();
 std::string EnglishRankingContextKey();
 // 混输英文槽位：按小写输入记（Y 模式去掉前缀），是英文在候选列表里的下标，上限是首页末位。
@@ -288,7 +322,7 @@ void EnqueueLearnEnglishSlotTask(const std::string &code, int english_index, std
 void EnqueueLearnDateTimeOrderTask(const std::string &format_id, uint64_t client_id, uint64_t activation_epoch);
 
 // event_listener_keys.cpp
-// 把译文页或日期页换回进入之前的那一屏；都没打开时什么都不做。
+// 把译文页或日期页换回进入之前的那一屏，进入之后切过字形时按当前字形换写法；都没打开时什么都不做。
 void ExitCandidateSubPage();
 // 选中「📅日期」入口：候选框换成 keyword 这组的全部格式。查不到格式时返回 false，候选框不动。
 bool EnterDateTimeCandidatePage(const std::string &keyword);
@@ -305,6 +339,14 @@ void PushUiLessCandidatesToOwner();
 
 // 拆分前 event_listener.cpp 里的前置声明，定义分布在各个 event_listener*.cpp。
 void PrepareCandidateList(uint64_t client_id, uint64_t activation_epoch);
+// 当前候选列表记下的字形与配置不同（组字途中切换了简繁）时，记下当前字形。这张列表组页时按字形展开过写法的，
+// 在它上面按当前字形换写法：候选的先后顺序不变；写法全归列表里别的底词的候选（「余」「馀」同在列表时的「馀」）
+// 切到繁体时不出现，切回简体也找不回来，要到下一次组页；高亮移到原来那个底词的写法组组首，新列表里没有它时
+// 移到第一页第一项。没展开过写法的列表（V 模式、日期时间等）连同页码与高亮原样不动。然后刷新本页、
+// 显示并推给 UI-less 宿主，返回 true；列表为空、在译文页或日期页上、列表不随字形变（见
+// FanyImeIpc::CandidateListFollowsCharacterSet）、属主已失效时什么都不做，返回 false。
+// 只在任务线程上调用。
+bool RespellCandidatesForCharacterSetChange();
 void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id);
 void ClearState();
 // count_first_word = false 时这次上屏不进首词命中率（五笔四码唯一自动上屏：用户没有做选择）。

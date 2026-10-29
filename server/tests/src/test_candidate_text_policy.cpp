@@ -81,6 +81,26 @@ TEST_CASE(candidate_text_policy_never_converts_japanese_candidates)
     }
 }
 
+// 切换字形后要不要换写法：只有中文方案下、不是 U 模式拆字列表、也不在英文状态时，列表才随字形变。
+TEST_CASE(candidate_text_policy_rebuilds_only_lists_that_follow_the_character_set)
+{
+    constexpr bool kEnglishInputMode = true;
+    constexpr bool kChineseInputMode = false;
+    REQUIRE(FanyImeIpc::CandidateListFollowsCharacterSet(kChineseScheme, kOtherCandidateList, kChineseInputMode));
+    for (const bool japanese : {kJapaneseScheme, kChineseScheme})
+    {
+        for (const bool radical : {kRadicalCandidateList, kOtherCandidateList})
+        {
+            for (const bool english : {kEnglishInputMode, kChineseInputMode})
+            {
+                if (!japanese && !radical && !english)
+                    continue;
+                REQUIRE(!FanyImeIpc::CandidateListFollowsCharacterSet(japanese, radical, english));
+            }
+        }
+    }
+}
+
 namespace
 {
 constexpr bool kRadicalModeTriggered = true;
@@ -145,23 +165,131 @@ TEST_CASE(candidate_text_policy_radical_composition_needs_u_at_the_start)
     REQUIRE(!FanyImeIpc::IsRadicalComposition(kRadicalModeTriggered, "aUkou"));
 }
 
-TEST_CASE(candidate_text_policy_converts_prefix_and_candidate_together_outside_radical_list)
+namespace
 {
-    const std::string committed =
-        FanyImeIpc::CommitTextAfterCreatingWordPrefix(kGan, kZao, kOtherCandidateList, FakeToTraditional);
-    REQUIRE_EQ(committed, kQianPhrase);
+const std::string kQianTraditional = "\xE4\xB9\xBE"; // 乾，「干」的另一种写法
+const std::string kFaHair = "\xE9\xAB\xAE";          // 髮，「发」的另一种写法
+constexpr bool kFirstSpellings = true;
+
+FanyImeIpc::ChosenText Chosen(const std::string &word, const std::string &output_text, bool first_spellings)
+{
+    return {word, output_text, first_spellings};
 }
 
+std::string Commit(const FanyImeIpc::ChosenText &prefix, const FanyImeIpc::ChosenText &candidate, bool radical)
+{
+    return FanyImeIpc::CommitTextAfterCreatingWordPrefix(prefix, candidate, radical, FakeToTraditional);
+}
+} // namespace
+
+// 两段都选了第一写法：按整串取第一写法，词组规则跨过段的交界（「干」「燥」→「乾燥」，不是「幹燥」）。
+TEST_CASE(candidate_text_policy_commits_the_whole_word_spelling_when_every_segment_took_its_first_spelling)
+{
+    REQUIRE_EQ(Commit(Chosen(kGan, kGanTraditional, kFirstSpellings), Chosen(kZao, kZao, kFirstSpellings),
+                      kOtherCandidateList),
+               kQianPhrase);
+}
+
+// 前缀里有一段选了非第一写法：上屏屏幕上显示的拼接。
+TEST_CASE(candidate_text_policy_commits_the_shown_text_when_a_prefix_segment_took_another_spelling)
+{
+    REQUIRE_EQ(Commit(Chosen(kGan, kQianTraditional, !kFirstSpellings), Chosen(kFa, kFaTraditional, kFirstSpellings),
+                      kOtherCandidateList),
+               kQianTraditional + kFaTraditional);
+}
+
+// U 模式拆字结果：前缀取前缀文字，候选原样。
 TEST_CASE(candidate_text_policy_converts_only_prefix_in_radical_list)
 {
-    const std::string committed =
-        FanyImeIpc::CommitTextAfterCreatingWordPrefix(kFa, kGan, kRadicalCandidateList, FakeToTraditional);
-    REQUIRE_EQ(committed, kFaTraditional + kGan);
+    REQUIRE_EQ(Commit(Chosen(kFa, kFaTraditional, kFirstSpellings), Chosen(kGan, kGanTraditional, kFirstSpellings),
+                      kRadicalCandidateList),
+               kFaTraditional + kGan);
+    // 前缀整串取第一写法：「干燥」作前缀时是「乾燥」。
+    REQUIRE_EQ(Commit(Chosen(kGan + kZao, kGanTraditional + kZao, kFirstSpellings),
+                      Chosen(kFa, kFaTraditional, kFirstSpellings), kRadicalCandidateList),
+               kQianPhrase + kFa);
+    REQUIRE_EQ(Commit(Chosen(kFa, kFaHair, !kFirstSpellings), Chosen(kGan, kGanTraditional, kFirstSpellings),
+                      kRadicalCandidateList),
+               kFaHair + kGan);
 }
 
 TEST_CASE(candidate_text_policy_commit_text_without_prefix)
 {
-    REQUIRE_EQ(FanyImeIpc::CommitTextAfterCreatingWordPrefix("", kGan, kRadicalCandidateList, FakeToTraditional), kGan);
-    REQUIRE_EQ(FanyImeIpc::CommitTextAfterCreatingWordPrefix("", kGan, kOtherCandidateList, FakeToTraditional),
-               kGanTraditional);
+    const auto empty = Chosen("", "", kFirstSpellings);
+    REQUIRE_EQ(Commit(empty, Chosen(kGan, kGanTraditional, kFirstSpellings), kRadicalCandidateList), kGan);
+    REQUIRE_EQ(Commit(empty, Chosen(kGan, kGanTraditional, kFirstSpellings), kOtherCandidateList), kGanTraditional);
+    REQUIRE_EQ(Commit(empty, Chosen(kGan, kQianTraditional, !kFirstSpellings), kOtherCandidateList), kQianTraditional);
+    REQUIRE_EQ(Commit(empty, Chosen(kGan + kZao, kGanTraditional + kZao, kFirstSpellings), kOtherCandidateList),
+               kQianPhrase);
+}
+
+// 简体模式：取第一写法就是原文，各段显示文字也是原文，结果与逐段拼接简体底词逐字相同。
+TEST_CASE(candidate_text_policy_simplified_mode_commits_the_simplified_words)
+{
+    const auto unchanged = [](const std::string &text) { return text; };
+    for (const bool radical : {kRadicalCandidateList, kOtherCandidateList})
+        for (const bool prefix_first : {true, false})
+            for (const bool candidate_first : {true, false})
+                for (const std::string &prefix : {std::string(), kGan, kGan + kZao})
+                {
+                    const auto committed = FanyImeIpc::CommitTextAfterCreatingWordPrefix(
+                        Chosen(prefix, prefix, prefix_first), Chosen(kFa, kFa, candidate_first), radical, unchanged);
+                    REQUIRE_EQ(committed, prefix + kFa);
+                    REQUIRE_EQ(FanyImeIpc::ChosenTextForOutput(Chosen(prefix, prefix, prefix_first), unchanged),
+                               prefix);
+                }
+}
+
+namespace
+{
+const std::string kTaiwanSimplified = "台湾";
+const std::string kTaiwanStandard = "臺灣"; // s2t，未展开的项（如快捷短语）显示的就是它
+const std::string kTaiwanHongKong = "台灣"; // 香港用户的第一写法
+const std::string kZhe = "着";
+const std::string kZheTaiwan = "著";
+
+// 假的「整词第一写法」：「台湾」取香港写法「台灣」；其余照 FakeToTraditional，再把「着」换成「著」。
+std::string FakeFirstSpelling(const std::string &text)
+{
+    if (text == kTaiwanSimplified)
+        return kTaiwanHongKong;
+    std::string result = FakeToTraditional(text);
+    for (size_t offset = result.find(kZhe); offset != std::string::npos; offset = result.find(kZhe, offset))
+        result.replace(offset, kZhe.size(), kZheTaiwan);
+    return result;
+}
+
+FanyImeIpc::ChosenText Shown(const std::string &word, const std::string &output_text)
+{
+    return FanyImeIpc::ChosenTextOf(word, output_text, FakeFirstSpelling);
+}
+} // namespace
+
+// R1：没有展开的项显示 s2t 结果，与地区第一写法不同时不算第一写法，上屏照显示。
+TEST_CASE(candidate_text_policy_an_unexpanded_candidate_commits_what_it_shows)
+{
+    const auto phrase = Shown(kTaiwanSimplified, kTaiwanStandard);
+    REQUIRE(!phrase.first_spellings);
+    REQUIRE_EQ(
+        FanyImeIpc::CommitTextAfterCreatingWordPrefix(Shown("", ""), phrase, kOtherCandidateList, FakeFirstSpelling),
+        kTaiwanStandard);
+    // 显示与第一写法相同时算第一写法，上屏结果也相同。
+    const auto same = Shown(kTaiwanSimplified, kTaiwanHongKong);
+    REQUIRE(same.first_spellings);
+    REQUIRE_EQ(
+        FanyImeIpc::CommitTextAfterCreatingWordPrefix(Shown("", ""), same, kOtherCandidateList, FakeFirstSpelling),
+        kTaiwanHongKong);
+}
+
+// R2：去重后编号为 0、但显示的不是底词第一写法的项（「着」组只剩「着」）不算第一写法，走显示拼接。
+TEST_CASE(candidate_text_policy_a_renumbered_spelling_is_not_the_first_spelling)
+{
+    const auto zhe = Shown(kZhe, kZhe);
+    REQUIRE(!zhe.first_spellings);
+    REQUIRE_EQ(FanyImeIpc::CommitTextAfterCreatingWordPrefix(Shown(kGan, kGanTraditional), zhe, kOtherCandidateList,
+                                                             FakeFirstSpelling),
+               kGanTraditional + kZhe);
+    REQUIRE_EQ(
+        FanyImeIpc::CommitTextAfterCreatingWordPrefix(Shown("", ""), zhe, kOtherCandidateList, FakeFirstSpelling),
+        kZhe);
 }
