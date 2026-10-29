@@ -1345,6 +1345,16 @@ void HandleClientMessage(HWND hwnd, const std::string &raw)
             if (!ec)
                 ShellExecuteW(hwnd, L"open", skins.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
         }
+        else if (type == "openLogDirectory")
+        {
+            // Keep in sync with the writer in src/log/candidate_diag_log.cpp: the
+            // diagnostics live under the data directory, not on the Desktop.
+            const std::filesystem::path logs = std::filesystem::path(CommonUtils::get_ime_data_path_w()) / L"logs";
+            std::error_code ec;
+            std::filesystem::create_directories(logs, ec);
+            if (!ec)
+                ShellExecuteW(hwnd, L"open", logs.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        }
         else if (type == "openHelpcodeDirectory")
         {
             const std::filesystem::path directory = metasequoia::path_from_utf8(GetCustomHelpcodeDirectory().c_str());

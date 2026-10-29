@@ -750,13 +750,21 @@ VisualPtr BuildAboutPage(PageContext &context)
         MakeRow(L"Server 端日志",
                 L"排查 Server "
                 L"通信和输入延迟时开启。记录慢请求阶段、候选窗、悬浮工具栏、菜单、焦点会话和通信状态，不记录按键、输入"
-                L"内容或候选文本。日志默认保存到桌面的“水杉IME诊断日志.log”，复现后可直接发送该文件。",
+                L"内容或候选文本。日志写到数据目录的 logs 文件夹，文件名带生成时间，例如 "
+                L"水杉IME诊断日志-server-20261029-153012.log。",
                 BindToggle(context, "general.diagnostic_log")));
     page.AddSection(MakeRow(L"TSF 端日志",
                             L"排查应用内预编辑和输入延迟时开启。TSF "
-                            L"日志会在内存中限量缓冲，并通过独立管道批量汇总到桌面的“水杉IME诊断日志."
-                            L"log”；不记录按键、输入内容或候选文本。",
+                            L"日志会在内存中限量缓冲，并通过独立管道批量汇总到同一个 logs 文件夹，文件名以 tsf "
+                            L"标识，与 Server 日志分开保存；不记录按键、输入内容或候选文本。",
                             BindToggle(context, "general.tsf_diagnostic_log")));
+    {
+        auto openLogs = std::make_shared<Button>(L"打开日志目录", ButtonKind::Secondary);
+        openLogs->SetOnClick([model]() { model->Post("openLogDirectory"); });
+        page.AddSection(MakeRow(
+            L"日志文件", L"复现一次后打开日志文件夹，发送最近生成的那份文件。最多保留最近 10 个文件，旧的自动删除。",
+            openLogs));
+    }
     // The button's handler only holds the state weakly (the state holds the button), so
     // the page has to own it or the first click finds it gone.
     return std::make_shared<OwnerBox>(page.Build(), state);

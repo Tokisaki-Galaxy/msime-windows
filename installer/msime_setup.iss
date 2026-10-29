@@ -1107,6 +1107,28 @@ begin
   DelTree(Path, True, True, True);
 end;
 
+{ 诊断日志每个会话一个文件，文件名前缀 水杉IME诊断日志- 是安装器与写入方唯一的契约，
+  见 server/src/log/diagnostic_log_naming.h。这里只删带前缀的文件，logs 目录里的
+  dictionary-build.log 和用户自己放进去的东西都留下。固定名是旧版留下的，升级时一并清掉。}
+procedure DeleteDiagnosticLogs(const Directory: String);
+var
+  FindRec: TFindRec;
+begin
+  DeleteFile(AddBackslash(Directory) + '水杉IME诊断日志.log');
+  DeleteFile(AddBackslash(Directory) + '水杉IME诊断日志.log.1');
+  if FindFirst(AddBackslash(Directory) + '水杉IME诊断日志-*', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then
+          DeleteFile(AddBackslash(Directory) + FindRec.Name);
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
 { 不独占的数据目录里删一个名单上的子目录。名字通用的几个只删我们写进去的内容，
   目录空了才删掉它：用户自己恰好也有一个 assets、html、logs 或 skins 文件夹时不能跟着没了。
   skins 里分不清哪些是外部皮肤、哪些是别人的东西，宁可留下。}
@@ -1122,10 +1144,7 @@ begin
     { 旧版的 WebView2 页面，见 IsRetiredAppDataItem。}
     TryDeleteTree(AddBackslash(ItemPath) + 'webview2')
   else if CompareText(FileName, 'logs') = 0 then
-  begin
-    DeleteFile(AddBackslash(ItemPath) + '水杉IME诊断日志.log');
-    DeleteFile(AddBackslash(ItemPath) + '水杉IME诊断日志.log.1');
-  end
+    DeleteDiagnosticLogs(ItemPath)
   else
   begin
     TryDeleteTree(ItemPath);

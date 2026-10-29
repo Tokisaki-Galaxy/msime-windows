@@ -124,6 +124,8 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_size_estimator.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/candidate_size_estimator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ipc_protocol_constants.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_diagnostic_log_naming.cpp"
+    "${CMAKE_SOURCE_DIR}/src/log/diagnostic_log_naming.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_voice_composition_pipe.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_voice_providers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ai_vendor.cpp"
