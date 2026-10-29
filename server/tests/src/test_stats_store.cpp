@@ -381,37 +381,41 @@ TEST_CASE(stats_store_schema_has_no_text_columns)
     const std::vector<std::string> allowed = {"day_key",         "hour",  "cjk",   "latin",     "digit",
                                               "punct",           "other", "chars", "active_ms", "first_word_hits",
                                               "first_word_total"};
-    size_t column_count = 0;
+    std::vector<std::string> columns;
     int step = SQLITE_OK;
     while ((step = sqlite3_step(statement)) == SQLITE_ROW)
     {
         const char *name = reinterpret_cast<const char *>(sqlite3_column_text(statement, 0));
         REQUIRE(name != nullptr);
-        ++column_count;
-        REQUIRE(std::find(allowed.begin(), allowed.end(), std::string(name)) != allowed.end());
+        columns.push_back(name);
     }
     REQUIRE_EQ(step, SQLITE_DONE);
-    // 表不存在或列被删掉时循环会真空通过；daily 9 列加 hourly 4 列正好 11。
-    REQUIRE_EQ(column_count, size_t{11});
     sqlite3_finalize(statement);
+    // 先收完再断言：断言失败时不能留着未 finalize 的语句，否则连接关不掉，
+    // 临时目录删不干净，后面的用例会连锁失败。
+    for (const std::string &name : columns)
+        REQUIRE(std::find(allowed.begin(), allowed.end(), name) != allowed.end());
+    // 表不存在或列被删掉时循环会真空通过；daily 9 列加 hourly 4 列正好 13。
+    REQUIRE_EQ(columns.size(), size_t{13});
 
     // 荣誉室只有目录 id 和解锁日期，没有可写自由文本的列。
     statement = nullptr;
     REQUIRE(sqlite3_prepare_v2(raw.get(), "SELECT name FROM pragma_table_info('stats_honor')", -1, &statement,
                                nullptr) == SQLITE_OK);
-    const std::vector<std::string> honor_allowed = {"id", "unlocked_day_key"};
     std::vector<std::string> honor_columns;
     while ((step = sqlite3_step(statement)) == SQLITE_ROW)
     {
         const char *name = reinterpret_cast<const char *>(sqlite3_column_text(statement, 0));
         REQUIRE(name != nullptr);
         honor_columns.push_back(name);
-        REQUIRE(std::find(honor_allowed.begin(), honor_allowed.end(), std::string(name)) != honor_allowed.end());
     }
     REQUIRE_EQ(step, SQLITE_DONE);
+    sqlite3_finalize(statement);
+    const std::vector<std::string> honor_allowed = {"id", "unlocked_day_key"};
+    for (const std::string &name : honor_columns)
+        REQUIRE(std::find(honor_allowed.begin(), honor_allowed.end(), name) != honor_allowed.end());
     // 表不存在时 pragma 返回零行，上面的循环会真空通过；这里把列数钉死。
     REQUIRE_EQ(honor_columns.size(), size_t{2});
-    sqlite3_finalize(statement);
 
     // WAL is a database property, so a second connection can assert it too.
     statement = nullptr;
