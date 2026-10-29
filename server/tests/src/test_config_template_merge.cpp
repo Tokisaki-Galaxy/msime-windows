@@ -372,7 +372,7 @@ TEST_CASE(shipped_fresh_install_defaults_do_not_flip_upgraded_users)
     const std::string previous_defaults = "[general]\nemoji_mixed_input = true\ncandidate_translations = true\n"
                                           "floating_toolbar_font_size = 24\n"
                                           "[association]\nsentence_wordlattice = true\n"
-                                          "[input]\ndefault_ime_mode = \"english\"\n"
+                                          "[input]\ndefault_ime_mode = \"english\"\nime_mode_scope = \"app\"\n"
                                           "[appearance]\ncandidate_window_layout = \"vertical\"\n"
                                           "candidate_skin = \"willow_green\"\n"
                                           "[helpcode]\nshuangpin_helpcode = true\nquanpin_helpcode = true\n"
@@ -389,6 +389,7 @@ TEST_CASE(shipped_fresh_install_defaults_do_not_flip_upgraded_users)
     // 0.12.0 起 sc.lm 改为按需下载，新装默认关；升级用户的模型由安装器挪进 models\language-model\，开关保持原样。
     REQUIRE(upgraded["association"]["sentence_wordlattice"].value_or(false));
     REQUIRE_EQ(upgraded["input"]["default_ime_mode"].value_or(std::string()), std::string("english"));
+    REQUIRE_EQ(upgraded["input"]["ime_mode_scope"].value_or(std::string()), std::string("app"));
     REQUIRE_EQ(upgraded["appearance"]["candidate_window_layout"].value_or(std::string()), std::string("vertical"));
     REQUIRE_EQ(upgraded["appearance"]["candidate_skin"].value_or(std::string()), std::string("willow_green"));
     REQUIRE(upgraded["helpcode"]["shuangpin_helpcode"].value_or(false));
@@ -404,6 +405,7 @@ TEST_CASE(shipped_fresh_install_defaults_do_not_flip_upgraded_users)
     // 新装用户拿到的是模板本身。
     const auto fresh = toml::parse(installed);
     REQUIRE_EQ(fresh["appearance"]["candidate_window_layout"].value_or(std::string()), std::string("horizontal"));
+    REQUIRE_EQ(fresh["input"]["ime_mode_scope"].value_or(std::string()), std::string("global"));
     REQUIRE(!fresh["helpcode"]["shuangpin_helpcode"].value_or(true));
     REQUIRE(!fresh["association"]["sentence_wordlattice"].value_or(true));
 }

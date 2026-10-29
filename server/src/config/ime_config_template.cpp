@@ -72,6 +72,7 @@ bool KeepsPreviousDefaultOnUpgrade(const std::string &assignment_id)
         MakeTomlAssignmentId("general", "floating_toolbar_font_size"),
         MakeTomlAssignmentId("association", "sentence_wordlattice"),
         MakeTomlAssignmentId("input", "default_ime_mode"),
+        MakeTomlAssignmentId("input", "ime_mode_scope"),
         MakeTomlAssignmentId("appearance", "candidate_window_layout"),
         MakeTomlAssignmentId("appearance", "candidate_skin"),
         MakeTomlAssignmentId("helpcode", "shuangpin_helpcode"),

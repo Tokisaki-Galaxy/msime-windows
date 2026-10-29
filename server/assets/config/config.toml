@@ -279,7 +279,7 @@ character_set = "simplified" # 候选输出字形，可选："simplified", "trad
 # 启动/从其他输入法切换到本输入法时的默认中英文，可选："chinese", "english"
 default_ime_mode = "chinese"
 # 中英文状态范围，可选："app"（按应用分别记忆）, "global"（所有应用保持统一）
-ime_mode_scope = "app"
+ime_mode_scope = "global"
 # 以词定字：开启后，[ 上屏高亮候选的首个汉字，] 上屏末个汉字
 word_to_character = false
 # brackets: [ / ]; minus_equal: - / =. Mutually exclusive with paging on the same keys.

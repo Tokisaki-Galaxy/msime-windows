@@ -51,7 +51,7 @@ std::atomic<bool> g_trilingual_cycle_enabled{false};
 std::string g_japanese_schema = "romaji";
 std::string g_character_set = "simplified";
 std::string g_default_ime_mode = "chinese";
-std::string g_ime_mode_scope = "app";
+std::string g_ime_mode_scope = "global";
 bool g_switch_language_shift_enabled = true;
 bool g_switch_language_ctrl_enabled = false;
 bool g_switch_language_ctrl_alt_space_enabled = true;
@@ -523,7 +523,7 @@ bool LoadImeConfig()
             g_default_ime_mode = mode == "english" ? "english" : "chinese";
         }
         {
-            const std::string scope = tbl["input"]["ime_mode_scope"].value_or(std::string("app"));
+            const std::string scope = tbl["input"]["ime_mode_scope"].value_or(std::string("global"));
             g_ime_mode_scope = scope == "global" ? "global" : "app";
         }
         {
