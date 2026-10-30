@@ -308,10 +308,13 @@ std::string BuildCurrentCandidatePage()
 
         CandidateViewItem view;
         view.text = word;
-        if (show_autocorrect_marker && !item.corrected_from.empty())
+        if (show_autocorrect_marker && !item.corrected_from.empty() && !item.jianpin_expansion)
         {
             // Correction-sourced candidates carry a light visible marker (PRD R5/AC7),
             // unless the user turned it off via quanpin.autocorrect_marker.
+            // jianpin_expansion marks a pure abbreviation expansion: it keeps
+            // corrected_from for preedit and ranking, but it is not a typo repair,
+            // so it stays unmarked.
             // Only the display text is touched: commits, word frequency updates and
             // pinned-position lookups read item.word / page_words and must never see
             // the marker suffix.

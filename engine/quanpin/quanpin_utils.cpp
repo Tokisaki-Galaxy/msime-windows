@@ -1139,6 +1139,37 @@ bool fault_slots_eligible(const std::vector<FaultSlot> &slots, const unsigned au
     return single_initial >= 2 && non_determining > 0 && slots.size() > kMaxShortAutocorrectSyllables;
 }
 
+bool fault_winner_is_pure_jianpin(const std::vector<FaultSlot> &slots, const Segments &winner)
+{
+    if (slots.size() != winner.size())
+    {
+        return false;
+    }
+    for (std::size_t i = 0; i < slots.size(); ++i)
+    {
+        switch (slots[i].kind)
+        {
+        case FaultSlotKind::Determining:
+            // 合法音节被改读就是纠错，哪怕字母数没变（lia -> lai）。
+            if (canonical_umlaut_spelling(winner[i]) != canonical_umlaut_spelling(slots[i].base_syllable))
+            {
+                return false;
+            }
+            break;
+        case FaultSlotKind::SingleInitial:
+            // 单字母段只能是同首字母的展开，或者原样保留。
+            if (winner[i].empty() || slots[i].raw_text.empty() || winner[i].front() != slots[i].raw_text.front())
+            {
+                return false;
+            }
+            break;
+        case FaultSlotKind::Fault:
+            return false;
+        }
+    }
+    return true;
+}
+
 namespace
 {
 // 罕见合法音节 -> 它的换位常用音节。人工收录、不由生成器派生：两侧都常用的换位对

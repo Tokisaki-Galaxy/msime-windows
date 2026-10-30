@@ -309,6 +309,11 @@ std::vector<std::pair<std::string, int>> fault_slot_correction_targets(const std
 // 快速路径的上限（kMaxShortAutocorrectSyllables）、掩码开着、无手动分隔符。
 bool fault_slots_eligible(const std::vector<FaultSlot> &slots, unsigned autocorrect_types);
 
+// 胜出读音是否只是把单字母槽展开成同首字母的完整音节、合法音节原样保留。true 表示
+// 这次改写属于简拼展开，不是拼写纠错，候选窗不应显示纠正标记。槽数与读音音节数
+// 不一致时按 false 处理，宁可多打标记也不漏打。
+bool fault_winner_is_pure_jianpin(const std::vector<FaultSlot> &slots, const Segments &winner);
+
 // 短串（<= 该槽位数的切分）继续走 autocorrect_cut_kbest 旧路径，行为零变。
 inline constexpr std::size_t kMaxShortAutocorrectSyllables = 4;
 // 容错词格的槽位上限：超过它的长句每槽展开的组合面太大，仲裁放弃（保持字面切分）。

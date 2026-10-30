@@ -2049,6 +2049,9 @@ std::vector<WordItem> QuanpinDictionary::arbitrate_fault_slots(const std::string
     // 与 arbitrate_legal_corrections 同判据打纠错标：读音字母不同于敲的字母才标。
     const std::string typed_letters = fold_autocorrect_letters(raw_input);
     const std::string corrected_letters = fold_autocorrect_letters(winner_key);
+    // 胜出读音只把单字母槽展开、合法音节原样保留时，这次改写是简拼本身，不是拼写纠错，
+    // 候选窗不显示纠正标记。纠错标记本身保留，预编辑与排序的分支判断照旧。
+    const bool pure_jianpin = quanpin::fault_winner_is_pure_jianpin(slots, winner_segments);
     if (corrected_letters != typed_letters)
     {
         for (auto &item : corrected)
@@ -2056,6 +2059,7 @@ std::vector<WordItem> QuanpinDictionary::arbitrate_fault_slots(const std::string
             if (item.corrected_from.empty() && fold_autocorrect_letters(item.pinyin) == corrected_letters)
             {
                 item.corrected_from = typed_letters;
+                item.jianpin_expansion = pure_jianpin;
             }
         }
     }
