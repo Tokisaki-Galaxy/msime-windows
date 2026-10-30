@@ -291,9 +291,10 @@ VisualPtr BuildToolsPage(PageContext &context)
         return std::make_shared<SettingRow>(QuickTitleBlock(title, description), BindToggle(context, path));
     };
     page.AddSection(centered(L"超级简拼(J 模式)",
-                             L"中文模式下按 Shift+J，之后输入的每个字母都作为简拼检索词库。全拼如 nh → "
-                             L"你好；双拼会按当前方案转换声母，例如小鹤 nu → n'sh（你说），与 ns → n's "
-                             L"不同。空格上屏；数字选词。调频规则与全拼 / 双拼相同。",
+                             L"仅双拼下可用。中文模式下按 Shift+J，之后输入的每个字母都作为简拼检索词库，"
+                             L"并按当前双拼方案转换声母。例如小鹤 nu → n'sh（你说），与 ns → n's 不同。"
+                             L"全拼不需要该模式，直接输入声母就是简拼，包括 zh / ch / sh 声母，例如 nh → 你好、"
+                             L"eq → 而且、zhly → 张靓颖。空格上屏；数字选词。",
                              "utility.jianpin_mode"));
     page.AddSection(
         centered(L"临时英文(Y 模式)",
