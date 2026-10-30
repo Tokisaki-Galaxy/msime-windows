@@ -1192,6 +1192,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
     const std::optional<SchemeType> scheme =
         g_inputSession ? std::optional<SchemeType>(g_inputSession->current_scheme_type()) : std::nullopt;
     const bool chinese_scheme = scheme == SchemeType::Quanpin || scheme == SchemeType::Shuangpin;
+    const bool shuangpin_scheme = scheme == SchemeType::Shuangpin;
     // T 模式对五笔同样开放，但五笔不能并进 chinese_scheme：那个变量还给 K/U/E/M/S/J/Y/R 触发与
     // ShouldLearnEnteredEnglishWord 用，并进去会让五笔连带打开其它本地模式（R7）。
     const bool date_time_scheme = chinese_scheme || scheme == SchemeType::Wubi;
@@ -1240,7 +1241,8 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
     if (chinese_scheme && !g_english_input_mode && GetConfiguredSymbolModeEnabled() && input_before_key.empty() &&
         Global::Keycode == 'S' && Global::Wch == L'S' && shift_only)
         g_symbol_mode_triggered = true;
-    if (chinese_scheme && !g_english_input_mode && GetConfiguredJianpinModeEnabled() && input_before_key.empty() &&
+    // 超级简拼只留给双拼：全拼直接打声母就是简拼，Shift+J 在全拼下按普通大写 J 处理。
+    if (shuangpin_scheme && !g_english_input_mode && GetConfiguredJianpinModeEnabled() && input_before_key.empty() &&
         Global::Keycode == 'J' && Global::Wch == L'J' && shift_only)
         g_jianpin_mode_triggered = true;
     if (chinese_scheme && !g_english_input_mode && GetConfiguredYModeEnabled() && input_before_key.empty() &&
