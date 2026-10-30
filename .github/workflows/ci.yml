@@ -59,10 +59,12 @@ jobs:
             architecture: x64
             triplet: x64-windows-static
             build_dir: windows/build
+            machine: x64
           - name: Win32
             architecture: Win32
             triplet: x86-windows-static
             build_dir: windows/build
+            machine: x86
           - name: arm64
             # 原生 Arm64 宿主与 x64 仿真宿主读同一份 InProcServer32，只能由一个 Arm64X 文件
             # 覆盖：buildarm64-release 那一遍准备链接输入，buildarm64x-release 这一遍链接出最终 DLL。
@@ -70,6 +72,9 @@ jobs:
             triplet: arm64ec-windows
             build_dir: windows/buildarm64x-release
             arm64x_pass: ARM64EC
+            machine: arm64
+            # 证明第二半真的合并进去了：Arm64X 内嵌完整的 Arm64 镜像，必须比只编 Arm64 的那份大。
+            native_dll: windows/buildarm64-release/Release/MetasequoiaImeTsf.dll
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -119,7 +124,7 @@ jobs:
         run: cmake --build ${{ matrix.build_dir }} --config Release --parallel
       - name: Check the Release binary and symbols
         shell: pwsh
-        run: ./scripts/ci/check-tsf-dll.ps1 -BuildDir '${{ matrix.build_dir }}'
+        run: ./scripts/ci/check-tsf-dll.ps1 -BuildDir '${{ matrix.build_dir }}' -Machine '${{ matrix.machine }}' -NativeArm64Dll '${{ matrix.native_dll }}'
       # 托管运行器是 x64，跑不了 Arm64 测试二进制；Arm64 侧 ABI 断言是编译期 static_assert。
       - name: Test the wire contract on this architecture
         if: ${{ matrix.name != 'arm64' }}

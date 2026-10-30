@@ -197,11 +197,13 @@ jobs:
             architecture: x64
             triplet: x64-windows-static
             build_dir: windows/build64-release
+            machine: x64
             vcpkg_root: E:\msime-runner\vcpkg-1
           - name: Win32
             architecture: Win32
             triplet: x86-windows-static
             build_dir: windows/build32-release
+            machine: x86
             vcpkg_root: E:\msime-runner\vcpkg-2
           - name: arm64
             # Arm64 宿主与 x64 仿真宿主读同一份 InProcServer32，只能由一个 Arm64X 文件覆盖：
@@ -212,6 +214,9 @@ jobs:
             triplet: arm64ec-windows
             build_dir: windows/buildarm64x-release
             arm64x_pass: ARM64EC
+            machine: arm64
+            # 证明第二半真的合并进去了：Arm64X 内嵌完整的 Arm64 镜像，必须比只编 Arm64 的那份大。
+            native_dll: windows/buildarm64-release/Release/MetasequoiaImeTsf.dll
             vcpkg_root: E:\msime-runner\vcpkg-2
     steps:
       - name: Check out release commit
@@ -322,7 +327,7 @@ jobs:
 
       - name: Check the TSF binary and symbols the installer expects
         shell: pwsh
-        run: ./scripts/ci/check-tsf-dll.ps1 -BuildDir '${{ matrix.build_dir }}'
+        run: ./scripts/ci/check-tsf-dll.ps1 -BuildDir '${{ matrix.build_dir }}' -Machine '${{ matrix.machine }}' -NativeArm64Dll '${{ matrix.native_dll }}'
 
       # 发布机是 x64，跑不了 Arm64 的测试二进制；Arm64 侧的 ABI 断言本身是编译期 static_assert，
       # 由上面的构建覆盖。
